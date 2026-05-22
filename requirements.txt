@@ -2,3 +2,6 @@ groq
 python-dotenv
 pandas
 scikit-learn
+joblib
+datasets
+matplotlib

@@ -24,6 +24,38 @@ health question, the full pipeline runs.
 
 ---
 
+## Module 1 - Language Detection
+
+Classifies the language of the user's message using a scikit-learn pipeline
+(TF-IDF character/word features + LinearSVC), trained on the
+[papluca/language-identification](https://huggingface.co/datasets/papluca/language-identification)
+dataset.
+
+Results (held-out test set, 10k samples):
+
+- Test accuracy: **99.56%**
+
+Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
+`nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
+
+Artifacts:
+
+- Notebook: `lang_detection/lang_detection.ipynb` (train + evaluate)
+- Inference helpers: `lang_detection/test_lang_detection.py` (`load`, `predict`)
+- Metrics: `lang_detection/metrics/`
+
+**Model weights:** Run the notebook to generate
+`lang_detection/models/language_detector.joblib` locally (~135MB; too large for
+standard GitHub uploads without Git LFS).
+
+Quick check after training:
+
+```bash
+python lang_detection/test_lang_detection.py
+```
+
+---
+
 ## Module 3 - Intent Classifier
 
 Classifies what the user wants using LLM prompting via the Groq API. 
