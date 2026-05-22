@@ -4,3 +4,7 @@ __pycache__/
 venv/
 env/
 .env
+
+# Trained language detector (~135MB); generate via lang_detection/lang_detection.ipynb
+lang_detection/models/*.joblib
+lang_detection/metrics/logs.log
