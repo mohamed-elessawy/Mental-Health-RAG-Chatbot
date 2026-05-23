@@ -1,18 +1,14 @@
 __pycache__/
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 8ce8367 (feat: add emotion classification pipeline and trained DistilBERT model)
 venv/
 env/
 .env
 
-<<<<<<< HEAD
 # Trained language detector (~135MB); generate via lang_detection/lang_detection.ipynb
 models/*.joblib
 *.log
-=======
+
 # temporary training outputs
 tmp_trainer/
 
@@ -31,4 +27,7 @@ training_args.bin
 *.pkl
 *.parquet
 models/distilbert/
->>>>>>> 8ce8367 (feat: add emotion classification pipeline and trained DistilBERT model)
+
+models/*
+!models/.gitkeep
+
