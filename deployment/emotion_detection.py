@@ -1,9 +1,38 @@
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
+import subprocess, sys
 
 MODEL_PATH  = Path(__file__).parent.parent / "models" / "distilbert"
 label_names = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
+
+MODEL_FILES = {
+    'config.json':           '1VYaXz6XgsCpTEzOCv-TTTPbgAZcejIiU',
+    'model.safetensors':     '1i0rBjiRCjTYHSKSIJH1mS-Ddk_g1j39L',
+    'tokenizer_config.json': '139JAm4B6sjhY4MrGo6xmR3UYLVafbvWO',
+    'tokenizer.json':        '1PWPC9PpMpeqkgq9fUq9B2qhwEtwx9V1q',
+}
+
+def _ensure_model():
+    """Download model files from Google Drive if not already present."""
+    if all((MODEL_PATH / f).exists() for f in MODEL_FILES):
+        return
+
+    try:
+        import gdown
+    except ImportError:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'gdown'])
+        import gdown
+
+    MODEL_PATH.mkdir(parents=True, exist_ok=True)
+    for filename, file_id in MODEL_FILES.items():
+        dest = MODEL_PATH / filename
+        if not dest.exists():
+            print(f'Downloading {filename} ...')
+            gdown.download(id=file_id, output=str(dest), quiet=False)
+    print('Model ready.')
+
+_ensure_model()
 
 # Load once at import time
 tokenizer = AutoTokenizer.from_pretrained(str(MODEL_PATH))
@@ -29,26 +58,3 @@ def predict_batch(texts: list[str]) -> list[str]:
         logits = model(**inputs).logits
     indices = logits.argmax(dim=-1).tolist()
     return [label_names[i] for i in indices]
-
-
-if __name__ == "__main__":
-    demo_texts = [
-        # formal
-        "I feel so happy today!",
-        "I am really scared about tomorrow",
-        "This makes me so angry",
-        "I love spending time with you",
-        "I feel so sad and empty",
-        "Wow I did not see that coming!",
-        # casual
-        "man i just got rejected it hurts so bad",
-        "bro i aced the exam lets gooo",
-        "idk why but i just feel empty today",
-        "she said yes!!!",
-        "I cant believe they did that to me",
-        "this is the best day of my life ngl",
-    ]
-
-    print("=== Emotion Detection — Smoke Test ===\n")
-    for text in demo_texts:
-        print(f"  '{text}' --> {predict(text)}")
