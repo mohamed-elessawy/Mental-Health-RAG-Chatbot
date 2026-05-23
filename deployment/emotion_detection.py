@@ -32,7 +32,6 @@ def predict_batch(texts: list[str]) -> list[str]:
 
 
 if __name__ == "__main__":
-    # Quick smoke test
     demo_texts = [
         # formal
         "I feel so happy today!",

@@ -27,6 +27,7 @@ training_args.bin
 *.pkl
 *.parquet
 models/distilbert/
+data/
 
 models/*
 !models/.gitkeep
