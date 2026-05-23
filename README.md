@@ -40,18 +40,20 @@ Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 
 Artifacts:
 
-- Notebook: `lang_detection/lang_detection.ipynb` (train + evaluate)
-- Inference helpers: `lang_detection/test_lang_detection.py` (`load`, `predict`)
-- Metrics: `lang_detection/metrics/`
+- Notebook: `notebooks/module1_language_detection.ipynb` (train + evaluate)
+- Inference helpers: `deployment/language_detection.py` (`load`, `predict`)
+- Metrics & outputs: `outputs/module1/`
 
 **Model weights:** Run the notebook to generate
-`lang_detection/models/language_detector.joblib` locally (~135MB; too large for
-standard GitHub uploads without Git LFS).
+`models/language_detector.joblib` locally (~135MB; too large for
+standard GitHub uploads without Git LFS). Alternatively, download the
+[pre-trained model](https://drive.google.com/drive/u/0/folders/1HwFTJHIGh-YJUSwL2ehmQyKZ9espjhtu)
+and place it in `models/language_detector.joblib`.
 
 Quick check after training:
 
 ```bash
-python lang_detection/test_lang_detection.py
+python deployment/language_detection.py
 ```
 
 ---
@@ -87,7 +89,10 @@ asking_mental_health_question, out_of_scope
 
 Model used: llama-3.3-70b-versatile via Groq API
 
----
+Artifacts:
+
+- Notebook: `notebooks/module3_intent_classifier.ipynb` (train + evaluate)
+- Inference script: `deployment/intent_classifier.py`
 
 ## Setup
 
