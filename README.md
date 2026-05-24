@@ -27,45 +27,94 @@ health question, the full pipeline runs.
 ## Module 1 - Language Detection
 
 Classifies the language of the user's message using a scikit-learn pipeline
-(TF-IDF character/word features + LinearSVC), trained on the
+(TF-IDF character/word features + `LinearSVC`), trained on the
 [papluca/language-identification](https://huggingface.co/datasets/papluca/language-identification)
-dataset.
+dataset (70k train / 10k test, 20 languages).
 
-Results (held-out test set, 10k samples) — see `outputs/module1/test_metrics.csv`:
+### Approach
 
-- Test accuracy: **99.56%** (best model: `model_1_full` after validation selection)
+The notebook trains **four model variants** and picks the best by validation accuracy:
+
+| Builder | Features | Notes |
+|---------|----------|--------|
+| `build_model_1` → `model_1_full` | char + char_wb + word n-grams | Highest capacity (default winner) |
+| `build_model_2` → `model_2_char_only` | char n-grams only | Faster training |
+| `build_model_3` → `model_3_word_charwb` | char_wb + word n-grams | Balanced |
+| `build_model_4` → `model_4_compact` | compact char n-grams | Smallest / fastest |
+
+Flow: stratified 90/10 train/validation split → EDA → compare all four on train/val/test →
+learning curve for the winner → retrain on train+val → evaluate on test → save model.
+
+### Results
+
+Held-out test set (10k samples) — see `outputs/module1/test_metrics.csv`:
+
+- Test accuracy: **99.56%**
+- Best model: **`model_2_char_only`**
 
 Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 `nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
 
-Artifacts (all under `outputs/module1/`, flat layout):
+### Notebook
+
+`notebooks/module1_language_detection.ipynb` — run top to bottom.
+
+| Section | What it does |
+|---------|----------------|
+| 1. Setup | Imports and paths (`outputs/module1/`, `models/`) |
+| 2. Model definitions | `build_model_1` … `build_model_4` |
+| 3. Training helpers | `fit_and_score`, learning curve, confusion matrix plot |
+| 4. Load dataset | Hugging Face load + stratified validation split |
+| 5. EDA | Language balance tables and distribution plots |
+| 6. Compare models | Train/val/test accuracy table → `model_comparison.csv` |
+| 7. Learning curve | Test accuracy vs training size → `learning_curve.csv` / `.png` |
+| 8. Final model | Test metrics, confusion matrix, `language_detector.joblib` |
+| 9. Demo | Sample predictions on multilingual text |
+
+### Outputs (`outputs/module1/`)
+
+All artifacts use a **flat folder** (no nested `metrics/` or `figures/`). Re-run the full notebook to regenerate any missing files.
+
+**Metrics (CSV / JSON)**
 
 | File | Description |
 |------|-------------|
-| `test_metrics.csv` / `test_metrics.json` | Final test accuracy and model name |
+| `test_metrics.csv` / `test_metrics.json` | Final test accuracy, best model name, sample counts |
 | `model_comparison.csv` | Train / val / test accuracy per model variant |
-| `learning_curve.csv` | Test accuracy vs training set size |
+| `learning_curve.csv` | Test accuracy at each training-set fraction |
 | `confusion_matrix.csv` | Confusion matrix on the test set |
 | `language_distribution.csv` | Sample counts per language and split |
-| `eda_overview.png` | EDA: balance, pie chart, length histogram & boxplot |
-| `eda_split_language_heatmap.png` | EDA: split × language counts |
-| `eda_language_proportions_stacked.png` | EDA: relative proportions per split |
-| `learning_curve.png` | Learning curve plot |
-| `confusion_matrix.png` | Confusion matrix plot |
 
-- Notebook: `notebooks/module1_language_detection.ipynb` (EDA, train, evaluate)
-- Inference helpers: `deployment/language_detection.py` (`load`, `detect_language`)
+**Plots (PNG)**
 
-**Model weights:** Run the notebook to generate
-`models/language_detector.joblib` locally (~135MB; too large for
-standard GitHub uploads without Git LFS). Alternatively, download the
+| File | Description |
+|------|-------------|
+| `eda_overview.png` | Bar chart (samples/lang), pie chart, length histogram, length boxplot |
+| `eda_split_language_heatmap.png` | Heatmap of counts (split × language) |
+| `eda_language_proportions_stacked.png` | Stacked bar — relative language share per split |
+| `learning_curve.png` | Train vs test accuracy vs training size |
+| `confusion_matrix.png` | Confusion matrix heatmap (test set) |
+
+**Currently in repo** (after partial runs, others appear when sections 6–8 complete):
+
+- `test_metrics.csv`, `test_metrics.json`
+- `eda_overview.png`
+- `learning_curve.png`
+
+### Inference
+
+`deployment/language_detection.py` — `load()` then `detect_language(text)`.
+
+**Model weights:** Run the notebook to produce `models/language_detector.joblib`
+locally (~135MB; too large for standard GitHub without Git LFS). Or download the
 [pre-trained model](https://drive.google.com/drive/u/0/folders/1HwFTJHIGh-YJUSwL2ehmQyKZ9espjhtu)
-and place it in `models/language_detector.joblib`.
+and place it at `models/language_detector.joblib`.
 
-Quick check after training:
+```python
+from deployment.language_detection import load, detect_language
 
-```bash
-python deployment/language_detection.py
+load()
+detect_language("How are you feeling today?")  # -> "en"
 ```
 
 ---
