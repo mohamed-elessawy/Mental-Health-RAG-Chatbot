@@ -135,6 +135,63 @@ Artifacts:
 - Inference script: `deployment/emotion_detection.py`
 - Results: `outputs/module2/` (classification reports, visualizations)
 ---
+## Module 2 — Emotion Classifier
+
+Classifies the emotional state of the user's message using a fine-tuned DistilBERT model
+trained on the [dair-ai/emotion](https://huggingface.co/datasets/dair-ai/emotion) dataset.
+
+Supported labels: `sadness`, `joy`, `love`, `anger`, `fear`, `surprise`
+
+Preprocessing:
+
+Before training, the dataset was cleaned:
+- Removed duplicates and empty texts
+- Stripped HTML artifacts and URLs
+- Normalized whitespace
+- Filtered extreme-length outliers (< 3 or > 300 words)
+
+| Split      | Rows after cleaning |
+|------------|-------------------|
+| Train      | 15,991            |
+| Validation | 1,999             |
+| Test       | 2,000             |
+
+Training
+
+A TF-IDF + Logistic Regression baseline was built first as a reference point, then DistilBERT
+was fine-tuned with class-weighted loss to handle label imbalance
+(joy: 5,359 examples vs. surprise: only 572).
+
+
+Results (validation set, 2,000 samples):
+
+| Model                  | Accuracy | Macro F1 |
+|------------------------|----------|----------|
+| TF-IDF + LogReg        | 88%      | 0.84     |
+| DistilBERT (epoch 4)   | 94%      | 0.92     |
+
+
+Model Weights:
+
+The fine-tuned model is too large to store in the repo. You have two options:
+
+1. **Train from scratch** — run the training cell in the notebook (~2 hours on CPU)
+2. **Download pre-trained weights** — run the download cell to pull the model from Google Drive
+into `models/distilbert/`, then skip straight to the evaluation cell
+
+
+Artifacts
+
+- Notebook: `notebooks/module2_emotion_classifier.ipynb`
+- Inference script: `deployment/emotion_detection.py`
+- Metrics & classification reports: `outputs/module2/`
+
+Quick check after downloading or training:
+
+```bash
+python deployment/emotion_detection.py
+```
+---
 
 ## Module 3 - Intent Classifier
 
