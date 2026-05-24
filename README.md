@@ -31,18 +31,30 @@ Classifies the language of the user's message using a scikit-learn pipeline
 [papluca/language-identification](https://huggingface.co/datasets/papluca/language-identification)
 dataset.
 
-Results (held-out test set, 10k samples):
+Results (held-out test set, 10k samples) — see `outputs/module1/test_metrics.csv`:
 
-- Test accuracy: **99.56%**
+- Test accuracy: **99.56%** (best model: `model_1_full` after validation selection)
 
 Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 `nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
 
-Artifacts:
+Artifacts (all under `outputs/module1/`, flat layout):
 
-- Notebook: `notebooks/module1_language_detection.ipynb` (train + evaluate)
-- Inference helpers: `deployment/language_detection.py` (`load`, `predict`)
-- Metrics & outputs: `outputs/module1/`
+| File | Description |
+|------|-------------|
+| `test_metrics.csv` / `test_metrics.json` | Final test accuracy and model name |
+| `model_comparison.csv` | Train / val / test accuracy per model variant |
+| `learning_curve.csv` | Test accuracy vs training set size |
+| `confusion_matrix.csv` | Confusion matrix on the test set |
+| `language_distribution.csv` | Sample counts per language and split |
+| `eda_overview.png` | EDA: balance, pie chart, length histogram & boxplot |
+| `eda_split_language_heatmap.png` | EDA: split × language counts |
+| `eda_language_proportions_stacked.png` | EDA: relative proportions per split |
+| `learning_curve.png` | Learning curve plot |
+| `confusion_matrix.png` | Confusion matrix plot |
+
+- Notebook: `notebooks/module1_language_detection.ipynb` (EDA, train, evaluate)
+- Inference helpers: `deployment/language_detection.py` (`load`, `detect_language`)
 
 **Model weights:** Run the notebook to generate
 `models/language_detector.joblib` locally (~135MB; too large for
