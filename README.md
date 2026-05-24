@@ -66,41 +66,31 @@ Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 | 3. Training helpers | `fit_and_score`, learning curve, confusion matrix plot |
 | 4. Load dataset | Hugging Face load + stratified validation split |
 | 5. EDA | Language balance tables and distribution plots |
-| 6. Compare models | Train/val/test accuracy table → `model_comparison.csv` |
-| 7. Learning curve | Test accuracy vs training size → `learning_curve.csv` / `.png` |
-| 8. Final model | Test metrics, confusion matrix, `language_detector.joblib` |
+| 6. Compare models | Train/val/test accuracy table (saves `model_comparison.csv` when run) |
+| 7. Learning curve | Test accuracy vs training size → `learning_curve.png` |
+| 8. Final model | Test metrics, confusion matrix plot, `language_detector.joblib` |
 | 9. Demo | Sample predictions on multilingual text |
 
 ### Outputs (`outputs/module1/`)
 
-All artifacts use a **flat folder** (no nested `metrics/` or `figures/`). Re-run the full notebook to regenerate any missing files.
+All artifacts use a **flat folder** (no nested `metrics/` or `figures/`).
 
-**Metrics (CSV / JSON)**
-
-| File | Description |
-|------|-------------|
-| `test_metrics.csv` / `test_metrics.json` | Final test accuracy, best model name, sample counts |
-| `model_comparison.csv` | Train / val / test accuracy per model variant |
-| `learning_curve.csv` | Test accuracy at each training-set fraction |
-| `confusion_matrix.csv` | Confusion matrix on the test set |
-| `language_distribution.csv` | Sample counts per language and split |
-
-**Plots (PNG)**
+**Committed in this branch**
 
 | File | Description |
 |------|-------------|
-| `eda_overview.png` | Bar chart (samples/lang), pie chart, length histogram, length boxplot |
-| `eda_split_language_heatmap.png` | Heatmap of counts (split × language) |
-| `eda_language_proportions_stacked.png` | Stacked bar — relative language share per split |
+| `test_metrics.csv` | Best model (`model_2_char_only`), test accuracy, sample counts |
+| `eda_overview.png` | EDA — bar chart (samples/lang), pie chart, length histogram, length boxplot |
+| `learning_curve.png` | Train vs test accuracy vs training size (`model_2_char_only`) |
+
+**Also written by the notebook** (re-run sections 5–8 to regenerate if needed):
+
+| File | Section |
+|------|---------|
+| `test_metrics.json` | 8 — same summary as the CSV |
+| `model_comparison.csv` | 6 — train / val / test accuracy per variant |
 | `learning_curve.png` | Train vs test accuracy vs training size |
-| `confusion_matrix.png` | Confusion matrix heatmap (test set) |
-
-**Currently in repo** (after partial runs, others appear when sections 6–8 complete):
-
-- `test_metrics.csv`, `test_metrics.json`
-- `eda_overview.png`
-- `learning_curve.png`
-
+| `eda_overview.png` | Bar chart (samples/lang), pie chart, length histogram, length boxplot |
 ### Inference
 
 `deployment/language_detection.py` — `load()` then `detect_language(text)`.
