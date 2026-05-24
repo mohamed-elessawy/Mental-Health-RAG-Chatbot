@@ -205,3 +205,35 @@ cp .env.example .env
 
 4. The language and emotion models download automatically on first use - just import the modules 
 and they will download in the background.
+
+## Module 4 - RAG Pipeline
+
+Answers mental health questions by retrieving relevant counseling conversations
+from a vector database and generating a grounded, empathetic response using an LLM.
+
+Dataset: [Amod/mental_health_counseling_conversations](https://huggingface.co/datasets/Amod/mental_health_counseling_conversations)
+
+---
+
+### Dataset Overview
+
+3,512 rows of real counseling conversations, each containing a user question
+and a counselor response. The same question can appear multiple times with
+different counselor responses, giving multiple perspectives on the same problem.
+
+After cleaning:
+- Removed 234 exact duplicate rows (same question and same response)
+- Removed 36 empty or near-empty responses (spam, links, single words)
+- Final: 3,476 rows, 991 unique questions
+
+![Responses per Question](outputs/module4/responses_per_question.png)
+
+The dataset covers family and relationship problems heavily. Topics like career
+stress or eating disorders are barely represented, so the system will perform
+better on the dominant topics.
+
+![Topic Distribution](outputs/module4/topic_distribution.png)
+
+Most questions have 1-4 counselor responses. Ten questions have 20+ responses
+each (max 47). These will be handled with MMR filtering during indexing to avoid
+storing near-identical perspectives.
