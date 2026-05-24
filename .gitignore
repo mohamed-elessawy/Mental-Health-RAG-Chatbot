@@ -1,5 +1,6 @@
 __pycache__/
 
+
 venv/
 env/
 .env
@@ -7,3 +8,27 @@ env/
 # Trained language detector (~135MB); generate via lang_detection/lang_detection.ipynb
 models/*.joblib
 *.log
+
+# temporary training outputs
+tmp_trainer/
+
+# ignore checkpoints only
+checkpoint-*/
+
+# ignore training state files
+optimizer.pt
+scheduler.pt
+rng_state.pth
+trainer_state.json
+training_args.bin
+
+# Large model/data files
+*.safetensors
+*.pkl
+*.parquet
+models/distilbert/
+data/
+
+models/*
+!models/.gitkeep
+
