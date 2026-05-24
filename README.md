@@ -37,8 +37,8 @@ The notebook trains **four model variants** and picks the best by validation acc
 
 | Builder | Features | Notes |
 |---------|----------|--------|
-| `build_model_1` → `model_1_full` | char + char_wb + word n-grams | Highest capacity (default winner) |
-| `build_model_2` → `model_2_char_only` | char n-grams only | Faster training |
+| `build_model_1` → `model_1_full` | char + char_wb + word n-grams | Highest capacity |
+| `build_model_2` → `model_2_char_only` | char n-grams only | **Best on validation** — faster training |
 | `build_model_3` → `model_3_word_charwb` | char_wb + word n-grams | Balanced |
 | `build_model_4` → `model_4_compact` | compact char n-grams | Smallest / fastest |
 
@@ -49,8 +49,8 @@ learning curve for the winner → retrain on train+val → evaluate on test → 
 
 Held-out test set (10k samples) — see `outputs/module1/test_metrics.csv`:
 
-- Test accuracy: **99.56%**
-- Best model: **`model_2_char_only`**
+- **Best on validation:** `model_2_char_only` (selected before final retrain on train+val)
+- Test accuracy: **99.56%** (after retraining the validation winner on train+val)
 
 Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 `nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
