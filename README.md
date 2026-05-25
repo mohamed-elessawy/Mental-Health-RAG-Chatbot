@@ -198,12 +198,21 @@ pip install -r requirements.txt
 3. Copy `.env.example` to `.env` and add your Groq API key:
 
 ```bash
-cp .env.example .env
+cp deployment/.env.example deployment/.env
 # Then edit .env and add: GROQ_API_KEY=your_key_here
 ```
 
 4. The language and emotion models download automatically on first use - just import the modules 
 and they will download in the background.
+
+5. Run the API server:
+
+```bash
+# make sure you're in the root directory where deployment/ is located
+uvicorn deployment.api.main:app --reload
+```
+you can test it on localhost: http://127.0.1:8000/docs
+
 
 ## Module 4 - RAG Pipeline
 
