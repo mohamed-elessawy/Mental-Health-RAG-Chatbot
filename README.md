@@ -294,3 +294,51 @@ better on the dominant topics.
 Most questions have 1-4 counselor responses. Ten questions have 20+ responses
 each (max 47). These will be handled with MMR filtering during indexing to avoid
 storing near-identical perspectives.
+
+### Pipeline
+
+991 unique questions were embedded using sentence-transformers (all-MiniLM-L6-v2)
+and indexed in Qdrant Cloud. Each document stores the question vector, consolidated
+responses, and detected topics as metadata.
+
+Before indexing, responses were filtered and consolidated:
+- MMR filtering at 0.75 similarity removed redundant responses, bringing the average
+  from 3.53 down to 2.31 responses per question
+- For questions with 10+ responses, similar response groups were consolidated using
+  an LLM, bringing the final average to 2.10 responses per question with a max of 12
+
+### Retrieval and Generation
+
+Every user message goes through query rewriting before hitting Qdrant. The rewriter
+strips irrelevant personal details, expands vague emotional terms into descriptive
+language, and extracts personal context like gender and relationship status. This
+improves retrieval quality significantly on noisy or vague inputs.
+
+The top 3 most relevant questions are retrieved from Qdrant. All their responses
+are passed to the LLM along with the detected emotion and personal context to
+generate a personalized, empathetic response.
+
+Models used:
+- Embeddings: all-MiniLM-L6-v2 via sentence-transformers
+- Query rewriting: llama-3.3-70b-versatile via Groq
+- Generation: openai/gpt-oss-120b via Groq
+
+How to use:
+
+Needs `GROQ_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY` in `.env`.
+
+```python
+from deployment.rag_pipeline import rag_answer
+
+result = rag_answer(
+    user_message="I have been feeling very anxious and cannot sleep",
+    emotion="fear"
+)
+print(result["answer"])
+```
+
+Artifacts:
+
+- Notebook: `notebooks/module4_rag_pipeline.ipynb`
+- Inference script: `deployment/rag_pipeline.py`
+- Outputs: `outputs/module4/`
