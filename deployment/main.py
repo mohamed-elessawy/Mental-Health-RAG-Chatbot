@@ -1,32 +1,30 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from pydantic import BaseModel
 from dotenv import load_dotenv
 from pathlib import Path
 
-from deployment import emotion_detection
-from deployment import intent_classifier
-from deployment import language_detection
-
-
+# Load env variables at the top before core configuration is imported
 env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+from deployment.services import emotion_detection
+from deployment.services import language_detection
+from deployment.services import rag_service
+from deployment.api.routes import router
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    load_dotenv(dotenv_path=env_path)
-    
-    intent_classifier.init_client()
-    
+async def lifespan(app: FastAPI):    
     print("Loading Emotion Detection Model...")
-    emotion_detection.load()
+    emotion_detection.load_emotion_model()
     
     print("Loading Language Detection Model...")
-    language_detection.load()
+    language_detection.load_language_model()
     
-    print("All models loaded successfully!")
-
+    print("Initializing RAG (SentenceTransformers & Qdrant)...")
+    rag_service.init_rag()
+    
+    print("All backend services loaded successfully!")
     yield
-    
     print("Shutting down and cleaning up resources...")
 
 app = FastAPI(
@@ -42,20 +40,4 @@ async def read_root():
 async def health_check():
     return {"status": "healthy"}
 
-class TextInput(BaseModel):
-    text: str
-
-@app.post("/detect-language")
-async def detect_language_endpoint(input_data: TextInput):
-    language = language_detection.detect_language(input_data.text)
-    return {"language": language}
-
-@app.post("/detect-emotion")
-async def detect_emotion_endpoint(input_data: TextInput):
-    emotion = emotion_detection.predict(input_data.text)
-    return {"emotion": emotion}
-
-@app.post("/classify-intent")
-async def classify_intent_endpoint(input_data: TextInput):
-    intent = intent_classifier.classify_intent(input_data.text)
-    return {"intent": intent}
+app.include_router(router)

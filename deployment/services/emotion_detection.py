@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 import subprocess, sys
 
-MODEL_PATH  = Path(__file__).parent.parent / "models" / "distilbert"
+MODEL_PATH  = Path(__file__).parent.parent.parent / "models" / "distilbert"
 label_names = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
 
 MODEL_FILES = {
@@ -35,7 +35,7 @@ def _ensure_model():
 tokenizer = None
 model = None
 
-def load():
+def load_emotion_model():
     """Load the emotion detection model and tokenizer into memory."""
     global tokenizer, model
     _ensure_model()
@@ -43,7 +43,7 @@ def load():
     model     = AutoModelForSequenceClassification.from_pretrained(str(MODEL_PATH))
     model.eval()
 
-def predict(text: str) -> str:
+def predict_emotion(text: str) -> str:
     """Return the predicted emotion label for a given text."""
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=128)
     inputs = {k: v for k, v in inputs.items() if k != "token_type_ids"}

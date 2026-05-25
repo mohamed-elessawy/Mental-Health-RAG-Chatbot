@@ -3,7 +3,7 @@ import joblib
 import subprocess
 import sys
 
-MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "language_detector.joblib"
+MODEL_PATH = Path(__file__).resolve().parent.parent.parent / "models" / "language_detector.joblib"
 
 MODEL_DRIVE_ID = "12dgGyGCMbAGWlW5-bL_NsrRS8XA3JqEg" 
 
@@ -27,13 +27,13 @@ def _ensure_model():
     gdown.download(id=MODEL_DRIVE_ID, output=str(MODEL_PATH), quiet=False)
     print("Language model ready.")
 
-def load():
+def load_language_model():
     """Loads the model into memory, downloading it first if necessary."""
     global _model
     _ensure_model()
     _model = joblib.load(MODEL_PATH)
 
-def detect_language(text: str) -> str:
+def detect_user_language(text: str) -> str:
     """Predicts the language of the given text."""
     if _model is None:
         raise RuntimeError("Model is not loaded. Call load() first before inference.")
