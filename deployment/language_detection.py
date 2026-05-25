@@ -36,6 +36,6 @@ def load():
 def detect_language(text: str) -> str:
     """Predicts the language of the given text."""
     if _model is None:
-        load() # Auto-load on first prediction
+        raise RuntimeError("Model is not loaded. Call load() first before inference.")
     result = _model.predict([text])
     return result[0]

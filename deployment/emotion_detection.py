@@ -32,13 +32,16 @@ def _ensure_model():
             gdown.download(id=file_id, output=str(dest), quiet=False)
     print('Model ready.')
 
-_ensure_model()
+tokenizer = None
+model = None
 
-# Load once at import time
-tokenizer = AutoTokenizer.from_pretrained(str(MODEL_PATH))
-model     = AutoModelForSequenceClassification.from_pretrained(str(MODEL_PATH))
-model.eval()
-
+def load():
+    """Load the emotion detection model and tokenizer into memory."""
+    global tokenizer, model
+    _ensure_model()
+    tokenizer = AutoTokenizer.from_pretrained(str(MODEL_PATH))
+    model     = AutoModelForSequenceClassification.from_pretrained(str(MODEL_PATH))
+    model.eval()
 
 def predict(text: str) -> str:
     """Return the predicted emotion label for a given text."""
