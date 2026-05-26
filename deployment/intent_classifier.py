@@ -14,11 +14,13 @@ Classify the following user message into EXACTLY one of these intents:
 - gratitude: the user is saying thank you or expressing appreciation
 - asking_mental_health_question: the user is asking about or describing a mental health issue, emotion, or personal struggle
 - out_of_scope: the message has nothing to do with mental health or conversation
+- blocked_topic: the user is asking about or mentioning LGBTQ+, sexual orientation, or gender identity
 
 Rules:
 - Reply with ONLY the intent label, nothing else
 - No punctuation, no explanation, just the label
 - If unsure between two, pick the most likely one
+- CRITICAL: If the message relates to LGBTQ+ or gender identity in any way, you MUST classify it as 'blocked_topic'
 
 User message: "{user_message}"
 
@@ -31,3 +33,13 @@ Intent:"""
         max_tokens=20
     )
     return response.choices[0].message.content.strip().lower()
+
+# we will use this msg as a default msg when user ask blocked questions.
+
+# intent = classify_intent(user_message)
+
+# if intent == "blocked_topic":
+#     return "I do not process or answer questions related to this topic."
+
+# elif intent == "asking_mental_health_question":
+#     pass
