@@ -135,64 +135,6 @@ Artifacts:
 - Inference script: `deployment/emotion_detection.py`
 - Results: `outputs/module2/` (classification reports, visualizations)
 ---
-## Module 2 — Emotion Classifier
-
-Classifies the emotional state of the user's message using a fine-tuned DistilBERT model
-trained on the [dair-ai/emotion](https://huggingface.co/datasets/dair-ai/emotion) dataset.
-
-Supported labels: `sadness`, `joy`, `love`, `anger`, `fear`, `surprise`
-
-Preprocessing:
-
-Before training, the dataset was cleaned:
-- Removed duplicates and empty texts
-- Stripped HTML artifacts and URLs
-- Normalized whitespace
-- Filtered extreme-length outliers (< 3 or > 300 words)
-
-| Split      | Rows after cleaning |
-|------------|-------------------|
-| Train      | 15,991            |
-| Validation | 1,999             |
-| Test       | 2,000             |
-
-Training
-
-A TF-IDF + Logistic Regression baseline was built first as a reference point, then DistilBERT
-was fine-tuned with class-weighted loss to handle label imbalance
-(joy: 5,359 examples vs. surprise: only 572).
-
-
-Results (validation set, 2,000 samples):
-
-| Model                  | Accuracy | Macro F1 |
-|------------------------|----------|----------|
-| TF-IDF + LogReg        | 88%      | 0.84     |
-| DistilBERT (epoch 4)   | 94%      | 0.92     |
-
-
-Model Weights:
-
-The fine-tuned model is too large to store in the repo. You have two options:
-
-1. **Train from scratch** — run the training cell in the notebook (~2 hours on CPU)
-2. **Download pre-trained weights** — run the download cell to pull the model from Google Drive
-into `models/distilbert/`, then skip straight to the evaluation cell
-
-
-Artifacts
-
-- Notebook: `notebooks/module2_emotion_classifier.ipynb`
-- Inference script: `deployment/emotion_detection.py`
-- Metrics & classification reports: `outputs/module2/`
-
-Quick check after downloading or training:
-
-```bash
-python deployment/emotion_detection.py
-```
----
-
 ## Module 3 - Intent Classifier
 
 Classifies what the user wants using LLM prompting via the Groq API. 
@@ -256,12 +198,21 @@ pip install -r requirements.txt
 3. Copy `.env.example` to `.env` and add your Groq API key:
 
 ```bash
-cp .env.example .env
+cp deployment/.env.example deployment/.env
 # Then edit .env and add: GROQ_API_KEY=your_key_here
 ```
 
 4. The language and emotion models download automatically on first use - just import the modules 
 and they will download in the background.
+
+5. Run the API server:
+
+```bash
+# make sure you're in the root directory where deployment/ is located
+uvicorn deployment.api.main:app --reload
+```
+you can test it on localhost: http://127.0.1:8000/docs
+
 
 ## Module 4 - RAG Pipeline
 

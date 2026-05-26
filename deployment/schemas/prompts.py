@@ -1,12 +1,7 @@
-import os
-from groq import Groq
-from dotenv import load_dotenv
+def get_intent_classification_prompt(user_message: str) -> str:
+    """Builds the prompt used for classifying the user's intent."""
 
-load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-def classify_intent(user_message: str) -> str:
-    prompt = f"""You are an intent classification system for a mental health chatbot.
+    return f"""You are an intent classification system for a mental health chatbot.
 
 Classify the following user message into EXACTLY one of these intents:
 - greeting: the user is saying hello or starting a conversation
@@ -26,13 +21,7 @@ User message: "{user_message}"
 
 Intent:"""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-        max_tokens=20
-    )
-    return response.choices[0].message.content.strip().lower()
+
 
 # we will use this msg as a default msg when user ask blocked questions.
 
@@ -43,3 +32,19 @@ Intent:"""
 
 # elif intent == "asking_mental_health_question":
 #     pass
+
+def get_generation_system_prompt(language: str, emotion: str, intent: str, context_text: str = None) -> str:
+    """Builds the dynamic system prompt based on user analysis and optional RAG context."""
+    
+    prompt = f"""You are a compassionate, empathetic mental health chatbot.
+Your primary role is to support the user.
+The user is speaking in {language}.
+The user has been classified with the following dominant emotion: {emotion}.
+The intent behind their message is: {intent}.
+"""
+    
+    if context_text:
+        prompt += f"\nUse the following referenced chunks to ground your knowledge and give accurate advice if applicable:\n{context_text}\n"
+        
+    prompt += "\nEnsure your response is caring, non-judgmental, and naturally conversational."
+    return prompt
