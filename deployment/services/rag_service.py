@@ -29,8 +29,7 @@ def rewrite_query(user_message: str) -> tuple:
             "role": "user",
             "content": get_query_rewrite_prompt(user_message)
         }],
-        temperature=0,
-        max_tokens=100
+        temperature=0
     )
     output       = response.choices[0].message.content.strip()
     context_line = ""
@@ -84,8 +83,7 @@ def generate_response(user_message: str, retrieved: list,
     response = litellm.completion(
         model=config.GENERATION_LLM_MODEL,
         messages=messages,
-        temperature=0.7,
-        max_tokens=500
+        temperature=0.7
     )
     return response.choices[0].message.content.strip()
 

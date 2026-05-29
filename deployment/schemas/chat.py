@@ -1,9 +1,10 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class Message(BaseModel):
     role: str
     content: str
+    language: Optional[str] = None
 
 class ChatRequest(BaseModel):
     text: str

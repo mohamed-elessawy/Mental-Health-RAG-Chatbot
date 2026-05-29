@@ -64,7 +64,8 @@ if user_input:
                 # Save to session state
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": answer
+                    "content": answer,
+                    "language": data.get("language", "")
                 })
                 st.session_state.meta.append({
                     "language": data.get("language", ""),

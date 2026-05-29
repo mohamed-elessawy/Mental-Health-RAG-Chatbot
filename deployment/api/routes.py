@@ -11,7 +11,7 @@ from deployment.services.translation import translate_to_english, translate_from
 
 router = APIRouter()
 
-NON_RAG_INTENTS = {"greeting", "goodbye", "gratitude", "out_of_scope"}
+NON_RAG_INTENTS = {"greeting", "goodbye", "gratitude", "out_of_scope", "follow_up"}
 
 
 @router.post("/detect-language")
@@ -34,23 +34,21 @@ async def chat_endpoint(request: ChatRequest):
     user_message = request.text
     history      = [msg.model_dump() for msg in request.history]
 
-    # Step 1 — language detection
-    language = detect_user_language(user_message)
+    # Step 1 — language detection (Sticky language for short messages)
+    if len(user_message.split()) <= 3 and history:
+        # Search backwards for the most recent message that has a language attached
+        last_lang = next((msg.get("language") for msg in reversed(history) if msg.get("language")), None)
+        if last_lang:
+            language = last_lang
+        else:
+            language = detect_user_language(user_message)
+    else:
+        language = detect_user_language(user_message)
 
     # Step 2 — intent classification
-    intent = classify_user_intent(user_message)
+    intent = classify_user_intent(user_message, history)
 
-    # Step 3 — blocked topic: hardcoded reply
-    if intent == "blocked_topic":
-        return ChatResponse(
-            intent=intent,
-            emotion="neutral",
-            language=language,
-            response="I do not process or answer questions related to this topic.",
-            retrieved_documents=False
-        )
-
-    # Step 4 — non-RAG intents: LLM replies naturally, no RAG, no translation
+    # Step 3 — non-RAG intents: LLM replies naturally, no RAG, no translation
     if intent in NON_RAG_INTENTS:
         system_prompt = get_generation_system_prompt(
             emotion="neutral",
@@ -65,8 +63,7 @@ async def chat_endpoint(request: ChatRequest):
         response = litellm.completion(
             model=config.GENERATION_LLM_MODEL,
             messages=messages,
-            temperature=0.7,
-            max_tokens=300
+            temperature=0.7
         )
         return ChatResponse(
             intent=intent,
@@ -76,20 +73,20 @@ async def chat_endpoint(request: ChatRequest):
             retrieved_documents=False
         )
 
-    # Step 5 — mental health question: translate to English if needed
+    # Step 4 — mental health question: translate to English if needed
     english_message = translate_to_english(user_message, language)
 
-    # Step 6 — emotion detection on English text
+    # Step 5 — emotion detection on English text
     emotion = predict_emotion(english_message)
 
-    # Step 7 — RAG pipeline
+    # Step 6 — RAG pipeline
     result = rag_answer(
         user_message=english_message,
         emotion=emotion,
         history=history
     )
 
-    # Step 8 — translate response back if needed
+    # Step 7 — translate response back if needed
     final_response = translate_from_english(result["answer"], language)
 
     return ChatResponse(

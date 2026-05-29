@@ -12,8 +12,7 @@ def translate_to_english(text: str, source_language: str) -> str:
             "role": "user",
             "content": get_translation_prompt(text, "English")
         }],
-        temperature=0,
-        max_tokens=500
+        temperature=0
     )
     return response.choices[0].message.content.strip()
 
@@ -27,7 +26,6 @@ def translate_from_english(text: str, target_language: str) -> str:
             "role": "user",
             "content": get_translation_prompt(text, target_language)
         }],
-        temperature=0,
-        max_tokens=500
+        temperature=0
     )
     return response.choices[0].message.content.strip()
