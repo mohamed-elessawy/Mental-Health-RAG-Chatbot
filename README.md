@@ -55,60 +55,103 @@ Held-out test set (10k samples) — see `outputs/module1/test_metrics.csv`:
 Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 `nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
 
-### Notebook
+How to use:
 
-`notebooks/module1_language_detection.ipynb` — run top to bottom.
-
-| Section | What it does |
-|---------|----------------|
-| 1. Setup | Imports and paths (`outputs/module1/`, `models/`) |
-| 2. Model definitions | `build_model_1` … `build_model_4` |
-| 3. Training helpers | `fit_and_score`, learning curve, confusion matrix plot |
-| 4. Load dataset | Hugging Face load + stratified validation split |
-| 5. EDA | Language balance tables and distribution plots |
-| 6. Compare models | Train/val/test accuracy table (saves `model_comparison.csv` when run) |
-| 7. Learning curve | Test accuracy vs training size → `learning_curve.png` |
-| 8. Final model | Test metrics, confusion matrix plot, `language_detector.joblib` |
-| 9. Demo | Sample predictions on multilingual text |
-
-### Outputs (`outputs/module1/`)
-
-All artifacts use a **flat folder** (no nested `metrics/` or `figures/`).
-
-**Committed in this branch**
-
-| File | Description |
-|------|-------------|
-| `test_metrics.csv` | Best model (`model_2_char_only`), test accuracy, sample counts |
-| `eda_overview.png` | EDA — bar chart (samples/lang), pie chart, length histogram, length boxplot |
-| `learning_curve.png` | Train vs test accuracy vs training size (`model_2_char_only`) |
-
-**Also written by the notebook** (re-run sections 5–8 to regenerate if needed):
-
-| File | Section |
-|------|---------|
-| `test_metrics.json` | 8 — same summary as the CSV |
-| `model_comparison.csv` | 6 — train / val / test accuracy per variant |
-| `learning_curve.png` | Train vs test accuracy vs training size |
-| `eda_overview.png` | Bar chart (samples/lang), pie chart, length histogram, length boxplot |
-### Inference
-
-`deployment/language_detection.py` — `load()` then `detect_language(text)`.
-
-**Model weights:** Run the notebook to produce `models/language_detector.joblib`
-locally (~135MB; too large for standard GitHub without Git LFS). Or download the
-[pre-trained model](https://drive.google.com/drive/u/0/folders/1HwFTJHIGh-YJUSwL2ehmQyKZ9espjhtu)
-and place it at `models/language_detector.joblib`.
+When you first import or use the language detection module, the model downloads automatically 
+from Google Drive (~135MB). This takes a few minutes. You only need to download it once - 
+it gets saved to `models/language_detector.joblib` and reuses that copy on future runs.
 
 ```python
-from deployment.language_detection import load, detect_language
+from deployment.language_detection import detect_language
 
-load()
-detect_language("How are you feeling today?")  # -> "en"
+# First call downloads the model, then detects language
+language = detect_language("Hello, how are you?")
+print(language)  # Output: en
 ```
 
----
+Or run the inference script directly:
 
+```bash
+python deployment/language_detection.py
+```
+
+Artifacts:
+
+- Notebook: `notebooks/module1_language_detection.ipynb` (training code)
+- Inference code: `deployment/language_detection.py`
+- Outputs: `outputs/module1/` (confusion matrix, metrics)
+
+---
+## Module 2 — Emotion Classifier
+
+Classifies the emotional state of the user's message using a fine-tuned DistilBERT model
+trained on the [dair-ai/emotion](https://huggingface.co/datasets/dair-ai/emotion) dataset.
+
+Supported labels: `sadness`, `joy`, `love`, `anger`, `fear`, `surprise`
+
+Preprocessing:
+
+Before training, the dataset was cleaned:
+- Removed duplicates and empty texts
+- Stripped HTML artifacts and URLs
+- Normalized whitespace
+- Filtered extreme-length outliers (< 3 or > 300 words)
+
+| Split      | Rows after cleaning |
+|------------|-------------------|
+| Train      | 15,991            |
+| Validation | 1,999             |
+| Test       | 2,000             |
+
+Training
+
+A TF-IDF + Logistic Regression baseline was built first as a reference point, then DistilBERT
+was fine-tuned with class-weighted loss to handle label imbalance
+(joy: 5,359 examples vs. surprise: only 572).
+
+
+Results (validation set, 2,000 samples):
+
+| Model                  | Accuracy | Macro F1 |
+|------------------------|----------|----------|
+| TF-IDF + LogReg        | 88%      | 0.84     |
+| DistilBERT (epoch 4)   | 94%      | 0.92     |
+
+How to use:
+
+When you first import or use the emotion detection module, it downloads the model files 
+automatically from Google Drive. This takes a few minutes on first use. The model files 
+get saved to `models/distilbert/` and reuse that copy on future runs.
+
+```python
+from deployment.emotion_detection import predict
+
+# First call downloads the model, then predicts emotion
+emotion = predict("I'm feeling really sad today")
+print(emotion)  # Output: sadness
+```
+
+For batch predictions on multiple texts:
+
+```python
+from deployment.emotion_detection import predict_batch
+
+emotions = predict_batch(["I'm happy", "I'm angry", "I'm scared"])
+print(emotions)  # Output: ['joy', 'anger', 'fear']
+```
+
+Or run the inference script directly:
+
+```bash
+python deployment/emotion_detection.py
+```
+
+Artifacts:
+
+- Notebook: `notebooks/module2_emotion_classifier.ipynb` (training code)
+- Inference script: `deployment/emotion_detection.py`
+- Results: `outputs/module2/` (classification reports, visualizations)
+---
 ## Module 3 - Intent Classifier
 
 Classifies what the user wants using LLM prompting via the Groq API. 
@@ -135,21 +178,135 @@ few-shot examples caused the model to pattern-match to the nearest
 example rather than reason about the full message. Zero-shot had no 
 such anchoring and handled all edge and adversarial cases correctly.
 
-Possible intents: greeting, goodbye, gratitude, 
-asking_mental_health_question, out_of_scope
-
 Model used: llama-3.3-70b-versatile via Groq API
+
+Possible intents: `greeting`, `goodbye`, `gratitude`, `asking_mental_health_question`, `out_of_scope`
+
+How to use:
+
+The intent classifier uses the Groq API, so no model download is needed. You just need to add 
+your Groq API key to the `.env` file.
+
+```python
+from deployment.intent_classifier import classify_intent
+
+# Needs GROQ_API_KEY in .env
+intent = classify_intent("I'm feeling depressed")
+print(intent)  # Output: asking_mental_health_question
+```
 
 Artifacts:
 
 - Notebook: `notebooks/module3_intent_classifier.ipynb` (train + evaluate)
 - Inference script: `deployment/intent_classifier.py`
 
+---
+
 ## Setup
 
 1. Clone the repo and create a virtual environment
 
-2. Install dependencies
-pip install -r requirements.txt
+2. Install dependencies:
 
-3. Copy .env.example to .env and fill in your API keys
+```bash
+pip install -r requirements.txt
+```
+
+3. Copy `.env.example` to `.env` and add your Groq API key:
+
+```bash
+cp deployment/.env.example deployment/.env
+# Then edit .env and add: GROQ_API_KEY=your_key_here
+```
+
+4. The language and emotion models download automatically on first use - just import the modules 
+and they will download in the background.
+
+5. Run the API server:
+
+```bash
+# make sure you're in the root directory where deployment/ is located
+uvicorn deployment.api.main:app --reload
+```
+you can test it on localhost: http://127.0.1:8000/docs
+
+
+## Module 4 - RAG Pipeline
+
+Answers mental health questions by retrieving relevant counseling conversations
+from a vector database and generating a grounded, empathetic response using an LLM.
+
+Dataset: [Amod/mental_health_counseling_conversations](https://huggingface.co/datasets/Amod/mental_health_counseling_conversations)
+
+---
+
+### Dataset Overview
+
+3,512 rows of real counseling conversations, each containing a user question
+and a counselor response. The same question can appear multiple times with
+different counselor responses, giving multiple perspectives on the same problem.
+
+After cleaning:
+- Removed 234 exact duplicate rows (same question and same response)
+- Removed 36 empty or near-empty responses (spam, links, single words)
+- Final: 3,476 rows, 991 unique questions
+
+![Responses per Question](outputs/module4/responses_per_question.png)
+
+The dataset covers family and relationship problems heavily. Topics like career
+stress or eating disorders are barely represented, so the system will perform
+better on the dominant topics.
+
+![Topic Distribution](outputs/module4/topic_distribution.png)
+
+Most questions have 1-4 counselor responses. Ten questions have 20+ responses
+each (max 47). These will be handled with MMR filtering during indexing to avoid
+storing near-identical perspectives.
+
+### Pipeline
+
+991 unique questions were embedded using sentence-transformers (all-MiniLM-L6-v2)
+and indexed in Qdrant Cloud. Each document stores the question vector, consolidated
+responses, and detected topics as metadata.
+
+Before indexing, responses were filtered and consolidated:
+- MMR filtering at 0.75 similarity removed redundant responses, bringing the average
+  from 3.53 down to 2.31 responses per question
+- For questions with 10+ responses, similar response groups were consolidated using
+  an LLM, bringing the final average to 2.10 responses per question with a max of 12
+
+### Retrieval and Generation
+
+Every user message goes through query rewriting before hitting Qdrant. The rewriter
+strips irrelevant personal details, expands vague emotional terms into descriptive
+language, and extracts personal context like gender and relationship status. This
+improves retrieval quality significantly on noisy or vague inputs.
+
+The top 3 most relevant questions are retrieved from Qdrant. All their responses
+are passed to the LLM along with the detected emotion and personal context to
+generate a personalized, empathetic response.
+
+Models used:
+- Embeddings: all-MiniLM-L6-v2 via sentence-transformers
+- Query rewriting: llama-3.3-70b-versatile via Groq
+- Generation: openai/gpt-oss-120b via Groq
+
+How to use:
+
+Needs `GROQ_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY` in `.env`.
+
+```python
+from deployment.rag_pipeline import rag_answer
+
+result = rag_answer(
+    user_message="I have been feeling very anxious and cannot sleep",
+    emotion="fear"
+)
+print(result["answer"])
+```
+
+Artifacts:
+
+- Notebook: `notebooks/module4_rag_pipeline.ipynb`
+- Inference script: `deployment/rag_pipeline.py`
+- Outputs: `outputs/module4/`
