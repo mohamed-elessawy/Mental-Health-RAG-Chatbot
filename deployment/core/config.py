@@ -3,9 +3,9 @@ from typing import Optional
 
 class Settings(BaseSettings):
     INTENT_LLM_MODEL: str = "groq/llama-3.1-8b-instant"
-    GENERATION_LLM_MODEL: str = "groq/llama-3.3-70b-versatile"
+    GENERATION_LLM_MODEL: str = "groq/openai/gpt-oss-120b"
     
-    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_URL: str
     QDRANT_API_KEY: str
     
     RETRIEVAL_TOP_K: int = 3
