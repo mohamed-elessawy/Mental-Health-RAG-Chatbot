@@ -27,13 +27,30 @@ health question, the full pipeline runs.
 ## Module 1 - Language Detection
 
 Classifies the language of the user's message using a scikit-learn pipeline
-(TF-IDF character/word features + LinearSVC), trained on the
+(TF-IDF character/word features + `LinearSVC`), trained on the
 [papluca/language-identification](https://huggingface.co/datasets/papluca/language-identification)
-dataset.
+dataset (70k train / 10k test, 20 languages).
 
-Results (held-out test set, 10k samples):
+### Approach
 
-- Test accuracy: **99.56%**
+The notebook trains **four model variants** and picks the best by validation accuracy:
+
+| Builder | Features | Notes |
+|---------|----------|--------|
+| `build_model_1` → `model_1_full` | char + char_wb + word n-grams | Highest capacity |
+| `build_model_2` → `model_2_char_only` | char n-grams only | **Best on validation** — faster training |
+| `build_model_3` → `model_3_word_charwb` | char_wb + word n-grams | Balanced |
+| `build_model_4` → `model_4_compact` | compact char n-grams | Smallest / fastest |
+
+Flow: stratified 90/10 train/validation split → EDA → compare all four on train/val/test →
+learning curve for the winner → retrain on train+val → evaluate on test → save model.
+
+### Results
+
+Held-out test set (10k samples) — see `outputs/module1/test_metrics.csv`:
+
+- **Best on validation:** `model_2_char_only` (selected before final retrain on train+val)
+- Test accuracy: **99.56%** (after retraining the validation winner on train+val)
 
 Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
 `nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
