@@ -1,2 +1,0 @@
-best_model,test_accuracy,n_train,n_test,n_languages
-model_2_char_only,0.9956,70000,10000,20

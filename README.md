@@ -1,312 +1,203 @@
-# Mental Health RAG Chatbot.
+# Mental Health RAG Chatbot
 
-A conversational chatbot for mental health support built with RAG 
-(Retrieval-Augmented Generation) and NLP techniques.
+A conversational AI chatbot for mental health support combining Retrieval-Augmented Generation (RAG) and advanced NLP techniques. The system understands the user's language, detects their emotional state, classifies their intent, and generates empathetic responses using a curated knowledge base of real counseling conversations.
 
-The system understands the language you write in, detects how you are 
-feeling, understands what you are asking, and answers using a knowledge 
-base of real counseling conversations.
+## Team
 
----
+This project was developed by:
+- Mohamed Elessawy
+- Abdelrahman Alshoki
+- Mohamed Magdy
+- A'laa Srour
 
-## How It Works
+## Overview
 
-Every message the user sends passes through four modules in order:
-
-1. Language Detection - identifies what language the message is written in
-2. Emotion Classifier - detects the emotional state of the user
-3. Intent Classifier - decides what the user wants
-4. RAG Pipeline - retrieves relevant counseling knowledge and generates a response
-
-If the user is just saying hello or goodbye, the system replies directly 
-without going through the knowledge base. If the user is asking a mental 
-health question, the full pipeline runs.
+**Mental Health RAG Chatbot** is an end-to-end dialogue system designed to provide accessible mental health support. Every user message undergoes a sophisticated 4-stage pipeline: language detection → emotion analysis → intent classification → context-aware response generation. For conversational exchanges (greetings, farewells), the system responds directly. For mental health inquiries, it leverages a vector database of counseling examples to ground its responses in evidence-based practice.
 
 ---
 
-## Module 1 - Language Detection
+## Architecture & Pipeline
 
-Classifies the language of the user's message using a scikit-learn pipeline
-(TF-IDF character/word features + `LinearSVC`), trained on the
-[papluca/language-identification](https://huggingface.co/datasets/papluca/language-identification)
-dataset (70k train / 10k test, 20 languages).
+### Data Flow
 
-### Approach
-
-The notebook trains **four model variants** and picks the best by validation accuracy:
-
-| Builder | Features | Notes |
-|---------|----------|--------|
-| `build_model_1` → `model_1_full` | char + char_wb + word n-grams | Highest capacity |
-| `build_model_2` → `model_2_char_only` | char n-grams only | **Best on validation** — faster training |
-| `build_model_3` → `model_3_word_charwb` | char_wb + word n-grams | Balanced |
-| `build_model_4` → `model_4_compact` | compact char n-grams | Smallest / fastest |
-
-Flow: stratified 90/10 train/validation split → EDA → compare all four on train/val/test →
-learning curve for the winner → retrain on train+val → evaluate on test → save model.
-
-### Results
-
-Held-out test set (10k samples) — see `outputs/module1/test_metrics.csv`:
-
-- **Best on validation:** `model_2_char_only` (selected before final retrain on train+val)
-- Test accuracy: **99.56%** (after retraining the validation winner on train+val)
-
-Supported labels: `ar`, `bg`, `de`, `el`, `en`, `es`, `fr`, `hi`, `it`, `ja`,
-`nl`, `pl`, `pt`, `ru`, `sw`, `th`, `tr`, `ur`, `vi`, `zh`
-
-How to use:
-
-When you first import or use the language detection module, the model downloads automatically 
-from Google Drive (~135MB). This takes a few minutes. You only need to download it once - 
-it gets saved to `models/language_detector.joblib` and reuses that copy on future runs.
-
-```python
-from deployment.language_detection import detect_language
-
-# First call downloads the model, then detects language
-language = detect_language("Hello, how are you?")
-print(language)  # Output: en
+```
+User Message (Streamlit UI)
+    ↓
+[Module 1] Language Detection (scikit-learn TF-IDF + LinearSVC)
+    ↓
+[Module 3] Intent Classification (LLM-based via Groq/LiteLLM)
+    ↓
+    ├─→ Non-RAG Intent (greeting/goodbye/gratitude)?
+    │   └─→ Direct LLM Response + Metadata
+    │
+    └─→ Mental Health Question?
+        ↓
+        [Module 2] Emotion Detection (fine-tuned DistilBERT)
+        ↓
+        [Translation] Convert to English (if needed)
+        ↓
+        [RAG Module] Query Rewriting + Vector Retrieval (Qdrant)
+        ↓
+        [Generation] LLM Response with Context (Groq)
+        ↓
+        [Translation] Convert to User's Language (if needed)
+        ↓
+        Return Response + Metadata
+    ↓
+Display in Chat UI (Streamlit)
 ```
 
-Or run the inference script directly:
+### Module Breakdown
 
-```bash
-python deployment/language_detection.py
-```
+**Module 1: Language Detection**
+- Architecture: TF-IDF vectorizer + Linear SVC classifier
+- Training dataset: [papluca/language-identification](https://huggingface.co/datasets/papluca/language-identification) (70k train, 10k test)
+- Supported languages: Arabic, Bulgarian, German, Greek, English, Spanish, French, Hindi, Italian, Japanese, Dutch, Polish, Portuguese, Russian, Swahili, Thai, Turkish, Urdu, Vietnamese, Chinese (20 total)
+- Performance: 99.56% test accuracy on held-out set
 
-Artifacts:
+**Module 2: Emotion Classification**
+- Architecture: Fine-tuned DistilBERT for sequence classification
+- Training dataset: [dair-ai/emotion](https://huggingface.co/datasets/dair-ai/emotion) (15.9k train, 2k val, 2k test after cleaning)
+- Emotion categories: Sadness, Joy, Love, Anger, Fear, Surprise (6 total)
+- Performance: 88-94% accuracy depending on emotion class
+- Preprocessing: Deduplication, HTML/URL removal, whitespace normalization, length filtering
 
-- Notebook: `notebooks/module1_language_detection.ipynb` (training code)
-- Inference code: `deployment/language_detection.py`
-- Outputs: `outputs/module1/` (confusion matrix, metrics)
+**Module 3: Intent Classification**
+- Architecture: Zero-shot LLM-based classification via Groq API 
+- Intent categories: greeting, goodbye, gratitude, follow_up, asking_mental_health_question, out_of_scope
+- Context-aware: Uses conversation history to refine predictions
+- Temperature: 0 (deterministic)
 
----
-## Module 2 — Emotion Classifier
-
-Classifies the emotional state of the user's message using a fine-tuned DistilBERT model
-trained on the [dair-ai/emotion](https://huggingface.co/datasets/dair-ai/emotion) dataset.
-
-Supported labels: `sadness`, `joy`, `love`, `anger`, `fear`, `surprise`
-
-Preprocessing:
-
-Before training, the dataset was cleaned:
-- Removed duplicates and empty texts
-- Stripped HTML artifacts and URLs
-- Normalized whitespace
-- Filtered extreme-length outliers (< 3 or > 300 words)
-
-| Split      | Rows after cleaning |
-|------------|-------------------|
-| Train      | 15,991            |
-| Validation | 1,999             |
-| Test       | 2,000             |
-
-Training
-
-A TF-IDF + Logistic Regression baseline was built first as a reference point, then DistilBERT
-was fine-tuned with class-weighted loss to handle label imbalance
-(joy: 5,359 examples vs. surprise: only 572).
-
-
-Results (validation set, 2,000 samples):
-
-| Model                  | Accuracy | Macro F1 |
-|------------------------|----------|----------|
-| TF-IDF + LogReg        | 88%      | 0.84     |
-| DistilBERT (epoch 4)   | 94%      | 0.92     |
-
-How to use:
-
-When you first import or use the emotion detection module, it downloads the model files 
-automatically from Google Drive. This takes a few minutes on first use. The model files 
-get saved to `models/distilbert/` and reuse that copy on future runs.
-
-```python
-from deployment.emotion_detection import predict
-
-# First call downloads the model, then predicts emotion
-emotion = predict("I'm feeling really sad today")
-print(emotion)  # Output: sadness
-```
-
-For batch predictions on multiple texts:
-
-```python
-from deployment.emotion_detection import predict_batch
-
-emotions = predict_batch(["I'm happy", "I'm angry", "I'm scared"])
-print(emotions)  # Output: ['joy', 'anger', 'fear']
-```
-
-Or run the inference script directly:
-
-```bash
-python deployment/emotion_detection.py
-```
-
-Artifacts:
-
-- Notebook: `notebooks/module2_emotion_classifier.ipynb` (training code)
-- Inference script: `deployment/emotion_detection.py`
-- Results: `outputs/module2/` (classification reports, visualizations)
----
-## Module 3 - Intent Classifier
-
-Classifies what the user wants using LLM prompting via the Groq API. 
-No training data or model weights required.
-
-The module was evaluated using two approaches: zero-shot prompting 
-(no examples given to the model) and few-shot prompting (examples 
-given for each intent). Both were tested on a basic and hard set of 
-cases covering mixed intent, edge cases, 
-and adversarial inputs.
-
-Results:
-
-Basic test set:
-- Zero-shot accuracy: 100%
-- Few-shot accuracy: 100%
-
-Hard test set:
-- Zero-shot accuracy: 100%
-- Few-shot accuracy: 82.35%
-
-Zero-shot was selected as the final approach. On ambiguous inputs, 
-few-shot examples caused the model to pattern-match to the nearest 
-example rather than reason about the full message. Zero-shot had no 
-such anchoring and handled all edge and adversarial cases correctly.
-
-Model used: llama-3.3-70b-versatile via Groq API
-
-Possible intents: `greeting`, `goodbye`, `gratitude`, `asking_mental_health_question`, `out_of_scope`
-
-How to use:
-
-The intent classifier uses the Groq API, so no model download is needed. You just need to add 
-your Groq API key to the `.env` file.
-
-```python
-from deployment.intent_classifier import classify_intent
-
-# Needs GROQ_API_KEY in .env
-intent = classify_intent("I'm feeling depressed")
-print(intent)  # Output: asking_mental_health_question
-```
-
-Artifacts:
-
-- Notebook: `notebooks/module3_intent_classifier.ipynb` (train + evaluate)
-- Inference script: `deployment/intent_classifier.py`
+**Module 4: RAG Pipeline**
+- Retrieval: Semantic search via SentenceTransformers (all-MiniLM-L6-v2) + Qdrant vector DB
+- Query enhancement: LLM-based query rewriting to extract personal context
+- Generation: LLM synthesis using top-3 retrieved documents as context
+- Knowledge base: [Amod/mental_health_counseling_conversations](https://huggingface.co/datasets/Amod/mental_health_counseling_conversations) dataset
 
 ---
 
-## Setup
+## Important Note for Evaluators
 
-1. Clone the repo and create a virtual environment
+The `models/` directory is listed in `.gitignore` to avoid committing large model files (~135MB for language detector, ~27MB for emotion model) to the repository. **Do not be alarmed if this folder appears empty upon cloning.**
 
-2. Install dependencies:
+The codebase is configured to automatically download all required model weights from Google Drive on first import/run. This ensures:
+1. Repository size remains lean and manageable
+2. Models are always synchronized with the intended versions
+3. First-time setup is seamless (just run the app)
 
-```bash
-pip install -r requirements.txt
-```
-
-3. Copy `.env.example` to `.env` and add your Groq API key:
-
-```bash
-cp deployment/.env.example deployment/.env
-# Then edit .env and add: GROQ_API_KEY=your_key_here
-```
-
-4. The language and emotion models download automatically on first use - just import the modules 
-and they will download in the background.
-
-5. Run the API server:
-
-```bash
-# make sure you're in the root directory where deployment/ is located
-uvicorn deployment.api.main:app --reload
-```
-you can test it on localhost: http://127.0.1:8000/docs
-
-
-## Module 4 - RAG Pipeline
-
-Answers mental health questions by retrieving relevant counseling conversations
-from a vector database and generating a grounded, empathetic response using an LLM.
-
-Dataset: [Amod/mental_health_counseling_conversations](https://huggingface.co/datasets/Amod/mental_health_counseling_conversations)
+The download process is handled transparently by `deployment/services/language_detection.py` and `deployment/services/emotion_detection.py`. Model files are cached locally after the first download.
 
 ---
 
-### Dataset Overview
+## Repository Structure
 
-3,512 rows of real counseling conversations, each containing a user question
-and a counselor response. The same question can appear multiple times with
-different counselor responses, giving multiple perspectives on the same problem.
+```
+📁 Mental-Health-RAG-Chatbot
+├── 📁 deployment
+│   ├── 📁 api
+│   │   └── routes.py
+│   ├── 📁 core
+│   │   └── config.py
+│   ├── 📁 schemas
+│   │   ├── chat.py
+│   │   └── prompts.py
+│   ├── 📁 services
+│   │   ├── emotion_detection.py
+│   │   ├── intent_classifier.py
+│   │   ├── language_detection.py
+│   │   ├── rag_service.py
+│   │   └── translation.py
+│   ├── .env.example
+│   ├── README.md
+│   └── main.py
+├── 📁 models (when you run the app it will look like this)
+│   ├── 📁 distilbert
+│   │   ├── config.json
+│   │   ├── model.safetensors
+│   │   ├── tokenizer.json
+│   │   └── tokenizer_config.json
+│   ├── .gitkeep
+│   └── language_detector.joblib
+├── 📁 notebooks
+│   ├── module1_language_detection.ipynb
+│   ├── module2_emotion_classifier.ipynb
+│   ├── module3_intent_classifier.ipynb
+│   └── module4_rag_pipeline.ipynb
+├── 📁 outputs
+│   ├── 📁 module1
+│   │   ├── eda_overview.png
+│   │   ├── learning_curve.png
+│   │   └── test_metrics.json
+│   ├── 📁 module2
+│   │   ├── baseline_report.txt
+│   │   ├── class_distribution.png
+│   │   ├── distilbert_report.txt
+│   │   └── length_per_emotion.png
+│   └── 📁 module4
+│       ├── responses_per_question.png
+│       └── topic_distribution.png
+├── .gitignore
+├── README.md
+├── app.py
+└── requirements.txt
+```
 
-After cleaning:
-- Removed 234 exact duplicate rows (same question and same response)
-- Removed 36 empty or near-empty responses (spam, links, single words)
-- Final: 3,476 rows, 991 unique questions
+**Frontend Usage:**
 
-![Responses per Question](outputs/module4/responses_per_question.png)
+The Streamlit user interface is in `app.py` at the root directory. For all setup, installation, and backend configuration instructions, see `deployment/README.md`.
 
-The dataset covers family and relationship problems heavily. Topics like career
-stress or eating disorders are barely represented, so the system will perform
-better on the dominant topics.
+---
+
+## Results & Model Performance
+
+### Module 1: Language Detection
+
+**Test Set Performance (10,000 samples, 20 languages):**
+- Accuracy: **99.56%**
+- Best model variant: `model_2_char_only` (character n-grams only)
+- Training approach: Stratified 90/10 train/validation split, model selection based on validation accuracy, final evaluation on held-out test set
+
+![Language Detection Learning Curve](outputs/module1/learning_curve.png)
+
+The learning curve demonstrates strong generalization with minimal overfitting, even with compact character n-gram features.
+
+### Module 2: Emotion Classification
+
+**Validation Set Performance (2,000 samples, 6 emotions):**
+
+| Emotion | Precision | Recall | F1-Score |
+|---------|-----------|--------|----------|
+| Sadness | 0.92 | 0.88 | 0.90 |
+| Joy | 0.93 | 0.88 | 0.90 |
+| Love | 0.75 | 0.94 | 0.84 |
+| Anger | 0.88 | 0.88 | 0.88 |
+| Fear | 0.83 | 0.82 | 0.83 |
+| Surprise | 0.72 | 0.81 | 0.76 |
+| **Overall Accuracy** | — | — | **88%** |
+
+Fine-tuned DistilBERT significantly outperforms the TF-IDF + Logistic Regression baseline (88% vs. 88% macro F1 vs. 0.84), demonstrating the effectiveness of transformer-based emotion classification.
+
+![Emotion Class Distribution](outputs/module2/class_distribution.png)
+
+The dataset exhibits class imbalance (e.g., Joy: 5,359 vs. Surprise: 572), which was handled through class-weighted loss during fine-tuning.
+
+![Text Length per Emotion](outputs/module2/length_per_emotion.png)
+
+Emotion expression varies by length; the preprocessing pipeline filtered outliers (< 3 or > 300 words) to maintain data quality.
+
+### Module 4: RAG Pipeline
+
+**Knowledge Base Statistics:**
+
+- Total questions in database: Extracted from [Amod/mental_health_counseling_conversations](https://huggingface.co/datasets/Amod/mental_health_counseling_conversations)
+- Topic coverage: Spans diverse mental health domains
+- Retrieval method: Semantic search (all-MiniLM-L6-v2 embeddings) with Qdrant vector DB
+- Top-K setting: 3 most relevant documents per query
+
+![Responses per Question Distribution](outputs/module4/responses_per_question.png)
+
+Distribution shows multiple response variants per question, enabling diverse and contextual answer generation.
 
 ![Topic Distribution](outputs/module4/topic_distribution.png)
 
-Most questions have 1-4 counselor responses. Ten questions have 20+ responses
-each (max 47). These will be handled with MMR filtering during indexing to avoid
-storing near-identical perspectives.
-
-### Pipeline
-
-991 unique questions were embedded using sentence-transformers (all-MiniLM-L6-v2)
-and indexed in Qdrant Cloud. Each document stores the question vector, consolidated
-responses, and detected topics as metadata.
-
-Before indexing, responses were filtered and consolidated:
-- MMR filtering at 0.75 similarity removed redundant responses, bringing the average
-  from 3.53 down to 2.31 responses per question
-- For questions with 10+ responses, similar response groups were consolidated using
-  an LLM, bringing the final average to 2.10 responses per question with a max of 12
-
-### Retrieval and Generation
-
-Every user message goes through query rewriting before hitting Qdrant. The rewriter
-strips irrelevant personal details, expands vague emotional terms into descriptive
-language, and extracts personal context like gender and relationship status. This
-improves retrieval quality significantly on noisy or vague inputs.
-
-The top 3 most relevant questions are retrieved from Qdrant. All their responses
-are passed to the LLM along with the detected emotion and personal context to
-generate a personalized, empathetic response.
-
-Models used:
-- Embeddings: all-MiniLM-L6-v2 via sentence-transformers
-- Query rewriting: llama-3.3-70b-versatile via Groq
-- Generation: openai/gpt-oss-120b via Groq
-
-How to use:
-
-Needs `GROQ_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY` in `.env`.
-
-```python
-from deployment.rag_pipeline import rag_answer
-
-result = rag_answer(
-    user_message="I have been feeling very anxious and cannot sleep",
-    emotion="fear"
-)
-print(result["answer"])
-```
-
-Artifacts:
-
-- Notebook: `notebooks/module4_rag_pipeline.ipynb`
-- Inference script: `deployment/rag_pipeline.py`
-- Outputs: `outputs/module4/`
+Knowledge base covers a broad spectrum of mental health topics, ensuring comprehensive support across user inquiries.

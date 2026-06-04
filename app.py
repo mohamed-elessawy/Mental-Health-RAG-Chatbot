@@ -3,7 +3,7 @@ import requests
 
 API_URL = "http://127.0.0.1:8000"
 
-st.set_page_config(page_title="Mental Health Support", page_icon="💙", layout="centered")
+st.set_page_config(page_title="Mental Health Support", layout="centered")
 
 st.title("Mental Health Support Chatbot")
 st.caption("A safe space to talk. Everything is confidential.")
