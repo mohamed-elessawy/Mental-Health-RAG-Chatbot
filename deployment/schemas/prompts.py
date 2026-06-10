@@ -1,5 +1,11 @@
-def get_intent_classification_prompt(user_message: str, assistant_last_message: str = "") -> str:
-    context_str = f'\nPrevious assistant message: "{assistant_last_message}"' if assistant_last_message else ""
+def get_intent_classification_prompt(
+    user_message: str, assistant_last_message: str = ""
+) -> str:
+    context_str = (
+        f'\nPrevious assistant message: "{assistant_last_message}"'
+        if assistant_last_message
+        else ""
+    )
     return f"""You are an intent classification system for a mental health chatbot.
 
 Classify the following user message into EXACTLY one of these intents:
@@ -44,7 +50,9 @@ User message: "{user_message}"
 """
 
 
-def get_generation_system_prompt(emotion: str, personal_context: str, context: str) -> str:
+def get_generation_system_prompt(
+    emotion: str, personal_context: str, context: str
+) -> str:
     return f"""You are a compassionate mental health support assistant.
 
 User emotional state : {emotion}

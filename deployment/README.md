@@ -187,4 +187,3 @@ Response:
   "retrieved_documents": true
 }
 ```
-

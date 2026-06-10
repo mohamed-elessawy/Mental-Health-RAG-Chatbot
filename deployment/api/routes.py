@@ -1,13 +1,16 @@
 import litellm
 from fastapi import APIRouter
-from deployment.schemas.chat import ChatRequest, ChatResponse
-from deployment.schemas.prompts import get_direct_reply_prompt, get_generation_system_prompt
+
 from deployment.core.config import config
+from deployment.schemas.chat import ChatRequest, ChatResponse
+from deployment.schemas.prompts import (
+    get_generation_system_prompt,
+)
 from deployment.services.emotion_detection import predict_emotion
-from deployment.services.language_detection import detect_user_language
 from deployment.services.intent_classifier import classify_user_intent
+from deployment.services.language_detection import detect_user_language
 from deployment.services.rag_service import rag_answer
-from deployment.services.translation import translate_to_english, translate_from_english
+from deployment.services.translation import translate_from_english, translate_to_english
 
 router = APIRouter()
 
@@ -32,12 +35,15 @@ async def classify_intent_endpoint(request: ChatRequest):
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     user_message = request.text
-    history      = [msg.model_dump() for msg in request.history]
+    history = [msg.model_dump() for msg in request.history]
 
     # Step 1 — language detection (Sticky language for short messages)
     if len(user_message.split()) <= 3 and history:
         # Search backwards for the most recent message that has a language attached
-        last_lang = next((msg.get("language") for msg in reversed(history) if msg.get("language")), None)
+        last_lang = next(
+            (msg.get("language") for msg in reversed(history) if msg.get("language")),
+            None,
+        )
         if last_lang:
             language = last_lang
         else:
@@ -51,9 +57,7 @@ async def chat_endpoint(request: ChatRequest):
     # Step 3 — non-RAG intents: LLM replies naturally, no RAG, no translation
     if intent in NON_RAG_INTENTS:
         system_prompt = get_generation_system_prompt(
-            emotion="neutral",
-            personal_context="none",
-            context=""
+            emotion="neutral", personal_context="none", context=""
         )
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history[-6:]:
@@ -61,16 +65,14 @@ async def chat_endpoint(request: ChatRequest):
         messages.append({"role": "user", "content": user_message})
 
         response = litellm.completion(
-            model=config.GENERATION_LLM_MODEL,
-            messages=messages,
-            temperature=0.7
+            model=config.GENERATION_LLM_MODEL, messages=messages, temperature=0.7
         )
         return ChatResponse(
             intent=intent,
             emotion="neutral",
             language=language,
             response=response.choices[0].message.content.strip(),
-            retrieved_documents=False
+            retrieved_documents=False,
         )
 
     # Step 4 — mental health question: translate to English if needed
@@ -80,11 +82,7 @@ async def chat_endpoint(request: ChatRequest):
     emotion = predict_emotion(english_message)
 
     # Step 6 — RAG pipeline
-    result = rag_answer(
-        user_message=english_message,
-        emotion=emotion,
-        history=history
-    )
+    result = rag_answer(user_message=english_message, emotion=emotion, history=history)
 
     # Step 7 — translate response back if needed
     final_response = translate_from_english(result["answer"], language)
@@ -94,5 +92,5 @@ async def chat_endpoint(request: ChatRequest):
         emotion=emotion,
         language=language,
         response=final_response,
-        retrieved_documents=True
+        retrieved_documents=True,
     )

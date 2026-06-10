@@ -63,7 +63,7 @@ Display in Chat UI (Streamlit)
 - Preprocessing: Deduplication, HTML/URL removal, whitespace normalization, length filtering
 
 **Module 3: Intent Classification**
-- Architecture: Zero-shot LLM-based classification via Groq API 
+- Architecture: Zero-shot LLM-based classification via Groq API
 - Intent categories: greeting, goodbye, gratitude, follow_up, asking_mental_health_question, out_of_scope
 - Context-aware: Uses conversation history to refine predictions
 - Temperature: 0 (deterministic)

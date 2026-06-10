@@ -31,4 +31,3 @@ data/
 
 models/*
 !models/.gitkeep
-
