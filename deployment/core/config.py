@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = 3
     EMBED_MODEL: str = "all-MiniLM-L6-v2"
 
+    LOG_LEVEL: str = "INFO"
+    ALLOWED_ORIGINS: list[str] = ["*"]
+
     class Config:
         extra = "ignore"
 
