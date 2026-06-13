@@ -59,7 +59,7 @@ Return Response + Metadata
 
 **Module 3: Intent Classification**
 - Architecture: Zero-shot LLM-based classification via Groq API
-- Intent categories: greeting, goodbye, gratitude, follow_up, asking_mental_health_question, out_of_scope
+- Intent categories: greeting, goodbye, gratitude, asking_mental_health_question, out_of_scope
 - Context-aware: Uses conversation history to refine predictions
 - Temperature: 0 (deterministic)
 
@@ -90,6 +90,13 @@ uv run streamlit run app.py
 ```
 
 First run takes a few minutes while models download from Google Drive.
+
+Alternatively, run the backend in Docker (CPU-only torch, models baked into the image):
+
+```bash
+docker build -t mental-health-chatbot .
+docker run --env-file deployment/.env -p 8000:8000 mental-health-chatbot
+```
 
 For full setup instructions, API documentation, endpoint details, and environment variable reference, see [deployment/README.md](deployment/README.md).
 
@@ -187,9 +194,11 @@ The codebase automatically downloads all required model weights from Google Driv
 │   └── 📁 module4
 │       ├── responses_per_question.png
 │       └── topic_distribution.png
+├── .dockerignore
 ├── .gitignore
 ├── .pre-commit-config.yaml
 ├── .python-version
+├── Dockerfile
 ├── README.md
 ├── app.py
 ├── conftest.py

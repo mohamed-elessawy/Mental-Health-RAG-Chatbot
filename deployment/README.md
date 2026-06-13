@@ -74,6 +74,30 @@ Opens at http://localhost:8501.
 
 ---
 
+## Running with Docker
+
+A `Dockerfile` is provided at the project root. It installs CPU-only PyTorch and
+bakes the language detector and emotion model into the image at build time, so
+no Google Drive download is needed at container startup.
+
+### Build the image
+
+From the root directory:
+
+```bash
+docker build -t mental-health-chatbot .
+```
+
+### Run the container
+
+```bash
+docker run --env-file deployment/.env -p 8000:8000 mental-health-chatbot
+```
+
+The API is then available at http://localhost:8000.
+
+---
+
 ## Running Tests
 
 Fast tests only (no model loading, suitable for CI):
