@@ -71,7 +71,7 @@ def generate_response(
     context = "\n\n".join(
         f"Counselor response {i + 1}.{j + 1}:\n{r}"
         for i, doc in enumerate(retrieved)
-        for j, r in enumerate(doc["responses"])
+        for j, r in enumerate(doc["responses"][:3])
     )
 
     system_prompt = get_generation_system_prompt(emotion, personal_context, context)
