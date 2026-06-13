@@ -17,7 +17,6 @@ VALID_INTENTS = {
     "greeting",
     "goodbye",
     "gratitude",
-    "follow_up",
     "asking_mental_health_question",
     "out_of_scope",
 }
