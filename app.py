@@ -45,7 +45,7 @@ if user_input:
             try:
                 response = requests.post(
                     f"{API_URL}/chat",
-                    json={"text": user_input, "history": history},
+                    json={"message": user_input, "history": history},
                     timeout=60,
                 )
                 data = response.json()
