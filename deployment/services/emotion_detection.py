@@ -1,9 +1,12 @@
+import logging
 import subprocess
 import sys
 from pathlib import Path
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+logger = logging.getLogger("serenity.services.emotion")
 
 MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "distilbert"
 label_names = ["sadness", "joy", "love", "anger", "fear", "surprise"]
@@ -31,9 +34,9 @@ def _ensure_model():
     for filename, file_id in MODEL_FILES.items():
         dest = MODEL_PATH / filename
         if not dest.exists():
-            print(f"Downloading {filename} ...")
+            logger.info("Downloading %s ...", filename)
             gdown.download(id=file_id, output=str(dest), quiet=False)
-    print("Model ready.")
+    logger.info("Model ready.")
 
 
 tokenizer = None

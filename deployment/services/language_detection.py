@@ -1,8 +1,11 @@
+import logging
 import subprocess
 import sys
 from pathlib import Path
 
 import joblib
+
+logger = logging.getLogger("serenity.services.language")
 
 MODEL_PATH = (
     Path(__file__).resolve().parent.parent.parent
@@ -29,9 +32,9 @@ def _ensure_model():
     # Make sure the models folder exists
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    print("Downloading Language Detection model...")
+    logger.info("Downloading Language Detection model...")
     gdown.download(id=MODEL_DRIVE_ID, output=str(MODEL_PATH), quiet=False)
-    print("Language model ready.")
+    logger.info("Language model ready.")
 
 
 def load_language_model():

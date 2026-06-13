@@ -4,7 +4,7 @@ from deployment.core.config import config
 from deployment.schemas.prompts import get_intent_classification_prompt
 
 
-def classify_user_intent(user_message: str, history: list = None) -> str:
+def classify_user_intent(user_message: str, history: list | None = None) -> str:
     assistant_last_message = ""
     if history:
         for msg in reversed(history):

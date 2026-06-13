@@ -1,3 +1,5 @@
+import logging
+
 import litellm
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
@@ -8,15 +10,17 @@ from deployment.schemas.prompts import (
     get_query_rewrite_prompt,
 )
 
+logger = logging.getLogger("serenity.services.rag")
+
 embedder = None
 qdrant = None
 
 
 def init_rag():
     global embedder, qdrant
-    print("Initializing Sentence Transformer...")
+    logger.info("Initializing Sentence Transformer...")
     embedder = SentenceTransformer(config.EMBED_MODEL)
-    print(f"Connecting to Qdrant at {config.QDRANT_URL}...")
+    logger.info("Connecting to Qdrant...")
     qdrant = QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_API_KEY)
 
 
@@ -61,7 +65,7 @@ def generate_response(
     retrieved: list,
     emotion: str = "neutral",
     personal_context: str = "none",
-    history: list = None,
+    history: list | None = None,
 ) -> str:
 
     context = "\n\n".join(
@@ -85,7 +89,7 @@ def generate_response(
 
 
 def rag_answer(
-    user_message: str, emotion: str = "neutral", history: list = None
+    user_message: str, emotion: str = "neutral", history: list | None = None
 ) -> dict:
     search_query, personal_context = rewrite_query(user_message)
     retrieved = retrieve_documents(search_query)
