@@ -12,40 +12,35 @@ This project was developed by:
 
 ## Overview
 
-**Mental Health RAG Chatbot** is an end-to-end dialogue system designed to provide accessible mental health support. Every user message undergoes a sophisticated 4-stage pipeline: language detection → emotion analysis → intent classification → context-aware response generation. For conversational exchanges (greetings, farewells), the system responds directly. For mental health inquiries, it leverages a vector database of counseling examples to ground its responses in evidence-based practice.
+**Mental Health RAG Chatbot** is an end-to-end dialogue system designed to provide accessible mental health support. Every user message undergoes a sophisticated 4-stage pipeline: language detection, emotion analysis, intent classification, and context-aware response generation. For conversational exchanges (greetings, farewells), the system responds directly. For mental health inquiries, it leverages a vector database of counseling examples to ground its responses in evidence-based practice.
 
 ---
 
 ## Architecture & Pipeline
 
 ### Data Flow
-
-```
-User Message (Streamlit UI)
-    ↓
+User Message
+|
 [Module 1] Language Detection (scikit-learn TF-IDF + LinearSVC)
-    ↓
+|
 [Module 3] Intent Classification (LLM-based via Groq/LiteLLM)
-    ↓
-    ├─→ Non-RAG Intent (greeting/goodbye/gratitude)?
-    │   └─→ Direct LLM Response + Metadata
-    │
-    └─→ Mental Health Question?
-        ↓
-        [Module 2] Emotion Detection (fine-tuned DistilBERT)
-        ↓
-        [Translation] Convert to English (if needed)
-        ↓
-        [RAG Module] Query Rewriting + Vector Retrieval (Qdrant)
-        ↓
-        [Generation] LLM Response with Context (Groq)
-        ↓
-        [Translation] Convert to User's Language (if needed)
-        ↓
-        Return Response + Metadata
-    ↓
-Display in Chat UI (Streamlit)
-```
+|
+|-- Non-RAG Intent (greeting/goodbye/gratitude/out_of_scope)?
+|   '-- Direct LLM Response + Metadata
+|
+'-- Mental Health Question?
+|
+[Translation] Convert to English (if needed)
+|
+[Module 2] Emotion Detection (fine-tuned DistilBERT)
+|
+[RAG Module] Query Rewriting + Vector Retrieval (Qdrant)
+|
+[Generation] LLM Response with Context (Groq)
+|
+[Translation] Convert to User's Language (if needed)
+|
+Return Response + Metadata
 
 ### Module Breakdown
 
@@ -76,16 +71,61 @@ Display in Chat UI (Streamlit)
 
 ---
 
+## Quick Start
+
+Prerequisites: Python 3.12+ and [uv](https://docs.astral.sh/uv/) installed.
+
+```bash
+# Install dependencies
+uv sync --dev
+
+# Copy and fill in your API keys
+cp deployment/.env.example deployment/.env
+
+# Run the backend
+uv run uvicorn deployment.main:app --reload
+
+# Run the Streamlit frontend (separate terminal)
+uv run streamlit run app.py
+```
+
+First run takes a few minutes while models download from Google Drive.
+
+For full setup instructions, API documentation, endpoint details, and environment variable reference, see [deployment/README.md](deployment/README.md).
+
+---
+
+## Development
+
+### Pre-commit hooks
+
+Linting (ruff) and formatting (ruff-format) run on every commit:
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+### Running tests
+
+```bash
+# Fast tests (mocked services, no model loading)
+uv run pytest -v -m "not slow"
+
+# All tests including real model inference
+uv run pytest -v
+
+# With coverage
+uv run pytest --cov=deployment --cov-report=term-missing -v
+```
+
+---
+
 ## Important Note for Evaluators
 
-The `models/` directory is listed in `.gitignore` to avoid committing large model files (~135MB for language detector, ~27MB for emotion model) to the repository. **Do not be alarmed if this folder appears empty upon cloning.**
+The `models/` directory is listed in `.gitignore` to avoid committing large model files (~135MB for language detector, ~27MB for emotion model) to the repository. Do not be alarmed if this folder appears empty upon cloning.
 
-The codebase is configured to automatically download all required model weights from Google Drive on first import/run. This ensures:
-1. Repository size remains lean and manageable
-2. Models are always synchronized with the intended versions
-3. First-time setup is seamless (just run the app)
-
-The download process is handled transparently by `deployment/services/language_detection.py` and `deployment/services/emotion_detection.py`. Model files are cached locally after the first download.
+The codebase automatically downloads all required model weights from Google Drive on first run. This ensures the repository stays lean, models are always the intended versions, and first-time setup is seamless. The download is handled by `deployment/services/language_detection.py` and `deployment/services/emotion_detection.py`. Model files are cached locally after the first download.
 
 ---
 
@@ -97,7 +137,8 @@ The download process is handled transparently by `deployment/services/language_d
 │   ├── 📁 api
 │   │   └── routes.py
 │   ├── 📁 core
-│   │   └── config.py
+│   │   ├── config.py
+│   │   └── logging.py
 │   ├── 📁 schemas
 │   │   ├── chat.py
 │   │   └── prompts.py
@@ -107,10 +148,20 @@ The download process is handled transparently by `deployment/services/language_d
 │   │   ├── language_detection.py
 │   │   ├── rag_service.py
 │   │   └── translation.py
+│   ├── 📁 tests
+│   │   ├── __init__.py
+│   │   ├── conftest.py
+│   │   ├── test_emotion_detection.py
+│   │   ├── test_endpoints.py
+│   │   ├── test_intent_classifier.py
+│   │   ├── test_language_detection.py
+│   │   ├── test_rag_service.py
+│   │   ├── test_schemas.py
+│   │   └── test_translation.py
 │   ├── .env.example
-│   ├── README.md
-│   └── main.py
-├── 📁 models (when you run the app it will look like this)
+│   ├── main.py
+│   └── README.md
+├── 📁 models (auto-downloaded on first run)
 │   ├── 📁 distilbert
 │   │   ├── config.json
 │   │   ├── model.safetensors
@@ -137,14 +188,15 @@ The download process is handled transparently by `deployment/services/language_d
 │       ├── responses_per_question.png
 │       └── topic_distribution.png
 ├── .gitignore
+├── .pre-commit-config.yaml
+├── .python-version
 ├── README.md
 ├── app.py
-└── requirements.txt
+├── conftest.py
+├── pyproject.toml
+├── requirements.txt
+└── uv.lock
 ```
-
-**Frontend Usage:**
-
-The Streamlit user interface is in `app.py` at the root directory. For all setup, installation, and backend configuration instructions, see `deployment/README.md`.
 
 ---
 
@@ -173,9 +225,9 @@ The learning curve demonstrates strong generalization with minimal overfitting, 
 | Anger | 0.88 | 0.88 | 0.88 |
 | Fear | 0.83 | 0.82 | 0.83 |
 | Surprise | 0.72 | 0.81 | 0.76 |
-| **Overall Accuracy** | — | — | **88%** |
+| **Overall Accuracy** | | | **88%** |
 
-Fine-tuned DistilBERT significantly outperforms the TF-IDF + Logistic Regression baseline (88% vs. 88% macro F1 vs. 0.84), demonstrating the effectiveness of transformer-based emotion classification.
+Fine-tuned DistilBERT significantly outperforms the TF-IDF + Logistic Regression baseline (88% vs. 0.84 macro F1), demonstrating the effectiveness of transformer-based emotion classification.
 
 ![Emotion Class Distribution](outputs/module2/class_distribution.png)
 
