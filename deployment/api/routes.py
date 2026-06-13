@@ -23,7 +23,7 @@ from deployment.services.translation import (
 router = APIRouter()
 logger = logging.getLogger("serenity.routes")
 
-NON_RAG_INTENTS = {"greeting", "goodbye", "gratitude", "out_of_scope", "follow_up"}
+NON_RAG_INTENTS = {"greeting", "goodbye", "gratitude", "out_of_scope"}
 
 
 @router.post("/detect-language")
