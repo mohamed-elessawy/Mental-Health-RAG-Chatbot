@@ -44,7 +44,6 @@ app = FastAPI(title="Serenity Mental Health Chatbot API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -10,7 +10,7 @@ from deployment.schemas.chat import (
     FeedbackRequest,
     FeedbackResponse,
 )
-from deployment.schemas.prompts import get_generation_system_prompt
+from deployment.schemas.prompts import get_non_rag_system_prompt
 from deployment.services.emotion_detection import predict_emotion
 from deployment.services.intent_classifier import classify_user_intent
 from deployment.services.language_detection import detect_user_language
@@ -28,17 +28,29 @@ NON_RAG_INTENTS = {"greeting", "goodbye", "gratitude", "out_of_scope", "follow_u
 
 @router.post("/detect-language")
 async def detect_language_endpoint(request: ChatRequest):
-    return {"language": detect_user_language(request.message)}
+    try:
+        return {"language": detect_user_language(request.message)}
+    except Exception:
+        logger.error("Language detection failed", exc_info=True)
+        raise
 
 
 @router.post("/detect-emotion")
 async def detect_emotion_endpoint(request: ChatRequest):
-    return {"emotion": predict_emotion(request.message)}
+    try:
+        return {"emotion": predict_emotion(request.message)}
+    except Exception:
+        logger.error("Emotion detection failed", exc_info=True)
+        raise
 
 
 @router.post("/classify-intent")
 async def classify_intent_endpoint(request: ChatRequest):
-    return {"intent": classify_user_intent(request.message)}
+    try:
+        return {"intent": classify_user_intent(request.message)}
+    except Exception:
+        logger.error("Intent classification failed", exc_info=True)
+        raise
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
@@ -75,21 +87,21 @@ async def chat_endpoint(request: ChatRequest):
 
     # Step 2 - intent classification
     intent = classify_user_intent(user_message, history)
+    if intent not in NON_RAG_INTENTS and intent != "asking_mental_health_question":
+        intent = "out_of_scope"
     logger.info("Intent: %s", intent)
 
-    # Step 3 - non-RAG intents: LLM replies directly
+    # Step 3 - handle non-RAG intents
     if intent in NON_RAG_INTENTS:
-        system_prompt = get_generation_system_prompt(
-            emotion="neutral", personal_context="none", context=""
-        )
-        messages = [{"role": "system", "content": system_prompt}]
-        for msg in history[-6:]:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-        messages.append({"role": "user", "content": user_message})
+        system_prompt = get_non_rag_system_prompt()
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
 
         try:
             response = litellm.completion(
-                model=config.GENERATION_LLM_MODEL, messages=messages, temperature=0.7
+                model=config.GENERATION_LLM_MODEL, messages=messages, temperature=0.3
             )
         except Exception:
             logger.error("LLM call failed for non-RAG intent", exc_info=True)
