@@ -1,6 +1,6 @@
 __pycache__/
 
-
+.venv/
 venv/
 env/
 .env
@@ -31,3 +31,10 @@ data/
 
 models/*
 !models/.gitkeep
+
+.coverage
+.pytest_cache/
+.ruff_cache/
+
+# this file includes the results of the tests, saved locally for reference.
+test_results.txt
