@@ -6,6 +6,57 @@ and exposes HTTP endpoints for inference.
 
 ---
 
+## Live Deployment
+
+The backend API is publicly accessible at:
+**`https://alaasrour-serenity-backend.hf.space`**
+
+## CI/CD Pipeline
+
+The pipeline is defined in `.github/workflows/ci.yml` and runs automatically on every push to `main`.
+
+### Pipeline Stages
+
+```
+push to main
+     │
+     ▼
+1. Lint & Unit Tests  (ruff + pytest -m "not slow")
+     │  slow tests require real model inference and are excluded from CI
+     │  to keep the pipeline fast — run them locally with: pytest -v
+     │  fails → pipeline stops
+     ▼
+2. Build & Push Docker Image
+     │  builds linux/amd64 image, pushes to Docker Hub
+     │  tags: <sha> + latest
+     ▼
+3. Deploy to Hugging Face Spaces
+     │  git push --force → HF rebuilds the Space container
+     ▼
+Live at https://alaasrour-serenity-backend.hf.space
+```
+
+### Required GitHub Secrets & Variables
+
+Go to **GitHub repo → Settings → Secrets and variables → Actions** and add:
+
+**Secrets** (sensitive — never logged):
+
+| Name | Description |
+|------|-------------|
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `HF_TOKEN` | Hugging Face write token |
+
+**Variables** (non-sensitive — visible in logs):
+
+| Name | Description |
+|------|-------------|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `HF_USERNAME` | Your Hugging Face username |
+| `HF_SPACE` | Your HF Space name |
+
+
+
 ## Quick Setup
 
 Prerequisites: Python 3.12+ and uv installed.
