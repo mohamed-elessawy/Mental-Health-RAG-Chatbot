@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)   
+load_dotenv(dotenv_path=env_path)
 
 from deployment.api.routes import router  # noqa: E402
 from deployment.core.config import config  # noqa: E402
