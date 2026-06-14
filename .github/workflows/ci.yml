@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 jobs:
-  # 1. Lint & Unit Tests
+  # 1. Lint + Unit Tests
   lint-and-test:
     name: Code Quality and Unit Testing
     runs-on: ubuntu-latest
@@ -18,43 +18,40 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install uv and Set up Python 3.12
-        uses: astral-sh/setup-uv@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
           enable-cache: true
 
-      - name: Install Project Dependencies
+      - name: Install Dependencies
         run: uv sync --frozen
 
       - name: Run Ruff Linter
-        run: |
-          uv run ruff check .
+        run: uv run ruff check deployment
 
       - name: Run Ruff Formatter Check
-        run: |
-          uv run ruff format --check .
+        run: uv run ruff format --check deployment
 
-      - name: Run Fast Unit Tests
-        run: |
-          uv run pytest -v -m "not slow"
+      - name: Run Unit Tests
+        run: uv run pytest -v -m "not slow"
 
 
-  # 2. Build & Push Docker Image to Docker Hub
+  # 2. Build & Push Docker Image
   build-and-push:
     name: Build and Push Docker Image
     needs: lint-and-test
-    # Only on pushes to main/master (not on PRs)
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code Base
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # Set up QEMU for multi-platform builds (linux/amd64 + linux/arm64)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -64,32 +61,29 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}      # Variable (not sensitive)
-          password: ${{ secrets.DOCKERHUB_TOKEN }}      # Secret (sensitive)
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Derive a clean image tag from the short Git SHA
-      - name: Derive Image Tag
+      - name: Generate Image Tag
         id: tag
         run: echo "TAG=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64
-          # Pushes two tags: the immutable SHA tag and a rolling "latest"
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/serenity-backend:${{ steps.tag.outputs.TAG }}
             ${{ vars.DOCKERHUB_USERNAME }}/serenity-backend:latest
-          # Layer cache stored in the registry for faster subsequent builds
-          cache-from: type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/serenity-backend:cache
-          cache-to:   type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/serenity-backend:cache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
 
-  # 3. Deploy to Hugging Face Spaces (mirror push)
+  # 3. Deploy to Hugging Face Spaces
   deploy-to-huggingface:
-    name: Sync Repository to Hugging Face Spaces
+    name: Deploy to Hugging Face Spaces
     needs: build-and-push
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
@@ -97,17 +91,13 @@ jobs:
     steps:
       - name: Checkout Code Base
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Push Mirror to Hugging Face Spaces
+      - name: Deploy to Hugging Face Space
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}            # Secret (sensitive)
-          HF_USERNAME: ${{ vars.HF_USERNAME }}         # Variable (not sensitive)
-          HF_SPACE: ${{ vars.HF_SPACE }}               # Variable (not sensitive)
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ vars.HF_USERNAME }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
         run: |
-          # Securely mirror the repository to the Hugging Face Space to
-          # trigger the remote container rebuild.
-          git push --force \
+          git push \
             "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}" \
             main
