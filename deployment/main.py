@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path=env_path)   
 
 from deployment.api.routes import router  # noqa: E402
 from deployment.core.config import config  # noqa: E402
@@ -41,9 +41,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Serenity Mental Health Chatbot API", lifespan=lifespan)
 
+# CORS: allow the GitHub Pages frontend and localhost for local development.
+DEFAULT_ORIGINS = [
+    "https://mohamed-elessawy.github.io",
+    "http://localhost:3000",
+    "http://localhost:8501",
+]
+
+allowed_origins = getattr(config, "ALLOWED_ORIGINS", None) or DEFAULT_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.ALLOWED_ORIGINS,
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
