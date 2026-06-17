@@ -97,6 +97,17 @@ jobs:
           HF_USERNAME: ${{ vars.HF_USERNAME }}
           HF_SPACE: ${{ vars.HF_SPACE }}
         run: |
+          # 1. Configure a temporary git identity inside the runner
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          
+          # 2. Untrack the outputs directory (to avoid pushing large binary files to Hugging Face)
+          git rm -rf --cached outputs/ || true
+          
+          # 3. Create a clean, temporary commit without the binary images
+          git commit -m "chore: strip binaries for HF deployment" --allow-empty
+          
+          # 4. Push the clean commit to Hugging Face
           git push -f \
             "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}" \
             HEAD:main
