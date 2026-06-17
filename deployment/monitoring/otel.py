@@ -61,7 +61,9 @@ def setup_metrics(settings: OtelSettings) -> metrics.Meter:
         headers=settings.metrics_headers(),
     )
     reader = PeriodicExportingMetricReader(exporter, export_interval_millis=15000)
-    provider = MeterProvider(resource=_build_resource(settings), metric_readers=[reader])
+    provider = MeterProvider(
+        resource=_build_resource(settings), metric_readers=[reader]
+    )
     metrics.set_meter_provider(provider)
     logger.info("OpenTelemetry metrics exporter configured: %s", endpoint)
     return metrics.get_meter(settings.OTEL_SERVICE_NAME)
