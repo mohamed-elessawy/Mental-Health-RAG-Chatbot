@@ -97,17 +97,24 @@ jobs:
           HF_USERNAME: ${{ vars.HF_USERNAME }}
           HF_SPACE: ${{ vars.HF_SPACE }}
         run: |
-          # 1. Configure a temporary git identity inside the runner
+          # 1. Completely delete the Git tracking folder inside the runner
+          rm -rf .git
+          
+          # 2. Re-initialize a brand new, empty Git environment
+          git init -b main
+          
+          # 3. Configure the temporary automation identity
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           
-          # 2. Untrack the outputs directory (to avoid pushing large binary files to Hugging Face)
+          # 4. Stage everything EXCEPT the outputs folder
+          git add .
           git rm -rf --cached outputs/ || true
           
-          # 3. Create a clean, temporary commit without the binary images
-          git commit -m "chore: strip binaries for HF deployment" --allow-empty
+          # 5. Commit it as a single, fresh deployment commit
+          git commit -m "deploy: initial clean release to hugging face"
           
-          # 4. Push the clean commit to Hugging Face
+          # 6. Force push this single clean commit to Hugging Face
           git push -f \
             "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}" \
-            HEAD:main
+            main
