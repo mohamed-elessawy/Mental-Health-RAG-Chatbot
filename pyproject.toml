@@ -26,6 +26,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.63b1",
     "opentelemetry-exporter-otlp>=1.42.1",
     "opentelemetry-exporter-prometheus>=0.63b1",
+    "pytest>=9.0.3",
 ]
 
 [dependency-groups]
