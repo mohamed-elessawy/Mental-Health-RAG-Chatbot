@@ -79,7 +79,7 @@ jobs:
           cache-to: type=gha,mode=max
 
 
-  # 3. Deploy to Hugging Face Spaces
+# 3. Deploy to Hugging Face Spaces
   deploy-to-huggingface:
     name: Deploy to Hugging Face Spaces
     needs: build-and-push
@@ -88,6 +88,8 @@ jobs:
     steps:
       - name: Checkout Code Base
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch the entire history for proper git operations (HF Spaces requires full history for deployment)
 
       - name: Deploy to Hugging Face Space
         env:
