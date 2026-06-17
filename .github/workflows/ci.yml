@@ -2,9 +2,8 @@ name: Serenity Backend CI/CD Pipeline
 
 on:
   push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+    branches:
+      - main
 
 jobs:
   # 1. Lint + Unit Tests
@@ -29,7 +28,7 @@ jobs:
           enable-cache: true
 
       - name: Install Dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --dev
 
       - name: Run Ruff Linter
         run: uv run ruff check deployment
@@ -45,7 +44,6 @@ jobs:
   build-and-push:
     name: Build and Push Docker Image
     needs: lint-and-test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
 
     steps:
@@ -85,7 +83,6 @@ jobs:
   deploy-to-huggingface:
     name: Deploy to Hugging Face Spaces
     needs: build-and-push
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
 
     steps:
