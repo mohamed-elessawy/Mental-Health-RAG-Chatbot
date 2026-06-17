@@ -1,45 +1,102 @@
 # Deployment Guide
 
-This directory contains the production-grade backend server for the Mental Health RAG Chatbot. It implements a FastAPI application that orchestrates the 4-module NLP pipeline and exposes HTTP endpoints for inference.
+This directory contains the production backend for the Mental Health RAG Chatbot.
+It implements a FastAPI application that orchestrates the 4-module NLP pipeline
+and exposes HTTP endpoints for inference.
 
 ---
 
+## Live Deployment
+
+The backend API is publicly accessible at:
+**`https://alaasrour-serenity-backend.hf.space`**
+
+## CI/CD Pipeline
+
+The pipeline is defined in `.github/workflows/ci.yml` and runs automatically on every push to `main`.
+
+### Pipeline Stages
+
+```
+push to main
+     │
+     ▼
+1. Lint & Unit Tests  (ruff + pytest -m "not slow")
+     │  slow tests require real model inference and are excluded from CI
+     │  to keep the pipeline fast — run them locally with: pytest -v
+     │  fails → pipeline stops
+     ▼
+2. Build & Push Docker Image
+     │  builds linux/amd64 image, pushes to Docker Hub
+     │  tags: <sha> + latest
+     ▼
+3. Deploy to Hugging Face Spaces
+     │  git push --force → HF rebuilds the Space container
+     ▼
+Live at https://alaasrour-serenity-backend.hf.space
+```
+
+### Required GitHub Secrets & Variables
+
+Go to **GitHub repo → Settings → Secrets and variables → Actions** and add:
+
+**Secrets** (sensitive — never logged):
+
+| Name | Description |
+|------|-------------|
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `HF_TOKEN` | Hugging Face write token |
+
+**Variables** (non-sensitive — visible in logs):
+
+| Name | Description |
+|------|-------------|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `HF_USERNAME` | Your Hugging Face username |
+| `HF_SPACE` | Your HF Space name |
+
+
+
 ## Quick Setup
 
-**Prerequisites:** Python 3.11+ and pip installed.
+Prerequisites: Python 3.12+ and uv installed.
 
-### 1. Create Virtual Environment
+### 1. Install Dependencies
 
-From the **root directory** of the project:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-### 2. Install Dependencies
+From the root directory of the project:
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
-### 3. Configure Environment
+For development (includes test and lint tools):
 
-Copy the template and edit with your API keys:
+```bash
+uv sync --dev
+```
+
+### 2. Configure Environment
+
+Copy the template and fill in your API keys:
+
 ```bash
 cp deployment/.env.example deployment/.env
 ```
 
-Edit `deployment/.env` with:
+Edit `deployment/.env`:
+
 ```dotenv
-GROQ_API_KEY=gsk_your_actual_key_here
+GROQ_API_KEY=gsk_your_key_here
 QDRANT_API_KEY=your_qdrant_api_key
 QDRANT_URL=https://your-cluster-id.region-0.aws.cloud.qdrant.io
 
-INTENT_LLM_MODEL="groq/llama-3.3-70b-versatile"
-GENERATION_LLM_MODEL="groq/llama-3.3-70b-versatile"
+INTENT_LLM_MODEL=groq/llama-3.1-8b-instant
+GENERATION_LLM_MODEL=groq/openai/gpt-oss-120b
 
 RETRIEVAL_TOP_K=3
-EMBED_MODEL="all-MiniLM-L6-v2"
+EMBED_MODEL=all-MiniLM-L6-v2
+LOG_LEVEL=INFO
+ALLOWED_ORIGINS=["*"]
 ```
 
 ---
@@ -48,30 +105,80 @@ EMBED_MODEL="all-MiniLM-L6-v2"
 
 ### Backend (FastAPI)
 
-From the **root directory**:
+From the root directory:
+
 ```bash
-python -m uvicorn deployment.main:app --reload
+uv run uvicorn deployment.main:app --reload
 ```
 
-Expected output:
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000
-Loading Emotion Detection Model...
-Loading Language Detection Model...
-Initializing RAG (SentenceTransformers & Qdrant)...
-All backend services loaded successfully!
-```
-
-**First run takes ~5 minutes** (downloads models from Google Drive).
+First run takes a few minutes while models download from Google Drive.
 
 ### Frontend (Streamlit)
 
-In a new terminal from the **root directory**:
+In a separate terminal:
+
 ```bash
-streamlit run app.py
+uv run streamlit run app.py
 ```
 
-The app opens at `http://localhost:8501`. Start typing in the chat box.
+Opens at http://localhost:8501.
+
+---
+
+## Running with Docker
+
+A `Dockerfile` is provided at the project root. It installs CPU-only PyTorch and
+bakes the language detector and emotion model into the image at build time, so
+no Google Drive download is needed at container startup.
+
+### Build the image
+
+From the root directory:
+
+```bash
+docker build -t mental-health-chatbot .
+```
+
+### Run the container
+
+```bash
+docker run --env-file deployment/.env -p 8000:8000 mental-health-chatbot
+```
+
+The API is then available at http://localhost:8000.
+
+---
+
+## Running Tests
+
+Fast tests only (no model loading, suitable for CI):
+
+```bash
+uv run pytest -v -m "not slow"
+```
+
+All tests including real model inference:
+
+```bash
+uv run pytest -v
+```
+
+With coverage report:
+
+```bash
+uv run pytest --cov=deployment --cov-report=term-missing -v
+```
+
+---
+
+## Pre-commit Hooks
+
+Linting and formatting run automatically on every commit:
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
 
 ---
 
@@ -82,7 +189,8 @@ The app opens at `http://localhost:8501`. Start typing in the chat box.
 ├── 📁 api
 │   └── routes.py
 ├── 📁 core
-│   └── config.py
+│   ├── config.py
+│   └── logging.py
 ├── 📁 schemas
 │   ├── chat.py
 │   └── prompts.py
@@ -92,91 +200,79 @@ The app opens at `http://localhost:8501`. Start typing in the chat box.
 │   ├── language_detection.py
 │   ├── rag_service.py
 │   └── translation.py
+├── 📁 tests
+│   ├── conftest.py
+│   ├── test_emotion_detection.py
+│   ├── test_endpoints.py
+│   ├── test_intent_classifier.py
+│   ├── test_language_detection.py
+│   ├── test_rag_service.py
+│   ├── test_schemas.py
+│   └── test_translation.py
 ├── .env.example
-├── README.md
-└── main.py
+├── main.py
+└── README.md
 ```
 
-### File & Folder Descriptions
+### File Descriptions
 
 | Item | Purpose |
 |------|---------|
-| **main.py** | FastAPI entry point. Initializes the app, loads all models on startup, and includes the router. |
-| **api/routes.py** | HTTP endpoints: `/detect-language`, `/detect-emotion`, `/classify-intent`, `/chat` (main orchestrator). |
-| **core/config.py** | Configuration management via Pydantic `BaseSettings`. Loads `.env` variables. |
-| **schemas/chat.py** | Pydantic models: `Message`, `ChatRequest`, `ChatResponse` for type safety. |
-| **schemas/prompts.py** | Prompt template functions for intent classification, query rewriting, translation, response generation. |
-| **services/language_detection.py** | Language detection service. Auto-downloads scikit-learn model from Google Drive. Exports `detect_user_language()`, `load_language_model()`. |
-| **services/emotion_detection.py** | Emotion classification service. Auto-downloads DistilBERT model from Google Drive. Exports `predict_emotion()`, `load_emotion_model()`. |
-| **services/intent_classifier.py** | Intent classification via Groq LLM. Exports `classify_user_intent()`. |
-| **services/rag_service.py** | RAG orchestration. Manages SentenceTransformers embeddings and Qdrant vector DB. Exports `init_rag()`, `retrieve_documents()`, `rag_answer()`. |
-| **services/translation.py** | Bidirectional translation via Groq LLM. Exports `translate_to_english()`, `translate_from_english()`. |
+| main.py | FastAPI entry point. Loads models on startup, configures CORS and logging. |
+| api/routes.py | HTTP endpoints: /chat, /feedback, /health, /detect-language, /detect-emotion, /classify-intent. |
+| core/config.py | Configuration via Pydantic BaseSettings. Loads from .env file. |
+| core/logging.py | Centralized logger setup for the serenity logger hierarchy. |
+| schemas/chat.py | Pydantic models: ChatRequest, ChatResponse, FeedbackRequest, FeedbackResponse. Includes input validation. |
+| schemas/prompts.py | Prompt templates for intent classification, query rewriting, translation, response generation, and non-RAG replies. |
+| services/language_detection.py | Language detection using a TF-IDF + LinearSVC pipeline. Auto-downloads from Google Drive. |
+| services/emotion_detection.py | Emotion classification using fine-tuned DistilBERT. Auto-downloads from Google Drive. |
+| services/intent_classifier.py | Intent classification via zero-shot LLM prompting through Groq. |
+| services/rag_service.py | RAG pipeline: query rewriting, Qdrant retrieval, LLM response generation. |
+| services/translation.py | Bidirectional translation via Groq LLM. Skips translation for English input/output. |
+| tests/ | Unit and integration tests. Slow tests (real models) marked with @pytest.mark.slow. |
 
 ---
 
 ## Environment Variables
 
-Required keys in `.env`:
-
-| Variable | Description |
-|----------|-------------|
-| `GROQ_API_KEY` | Get free API key at [console.groq.com](https://console.groq.com) |
-| `QDRANT_API_KEY` | Get from Qdrant Cloud or set for local deployment |
-| `QDRANT_URL` | Qdrant cluster endpoint (cloud or `http://localhost:6333` for local) |
-| `INTENT_LLM_MODEL` | LLM for intent classification and query rewriting |
-| `GENERATION_LLM_MODEL` | LLM for response generation |
-| `RETRIEVAL_TOP_K` | Number of documents to retrieve (default: 3) |
-| `EMBED_MODEL` | Embedding model name (default: `all-MiniLM-L6-v2`) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| GROQ_API_KEY | Yes | API key from console.groq.com. Used by litellm for all LLM calls. |
+| QDRANT_API_KEY | Yes | API key from Qdrant Cloud. |
+| QDRANT_URL | Yes | Qdrant cluster endpoint. |
+| INTENT_LLM_MODEL | No | LLM for intent classification and query rewriting. Default: groq/llama-3.1-8b-instant |
+| GENERATION_LLM_MODEL | No | LLM for response generation. Default: groq/openai/gpt-oss-120b |
+| RETRIEVAL_TOP_K | No | Number of documents to retrieve. Default: 3 |
+| EMBED_MODEL | No | Sentence embedding model. Default: all-MiniLM-L6-v2 |
+| LOG_LEVEL | No | Logging verbosity. Default: INFO |
+| ALLOWED_ORIGINS | No | CORS allowed origins list. Default: ["*"] |
 
 ---
 
 ## API Endpoints
 
-**Interactive API Explorer:** Once the backend is running, visit `http://127.0.0.1:8000/docs` to explore and test all endpoints in Swagger UI.
+Interactive API explorer available at http://127.0.0.1:8000/docs when the backend is running.
 
-### Health Check
-```bash
-curl http://127.0.0.1:8000/health
+### GET /health
+
+Returns service status and whether all models are loaded.
+
+```json
+{"status": "healthy", "models_loaded": true}
 ```
 
-### Detect Language
-**POST** `/detect-language`
+### POST /chat
+
+Main endpoint. Accepts a message, runs the full pipeline, returns a response.
+
+Request:
 ```json
 {
-  "text": "Bonjour, comment allez-vous?",
+  "message": "I have been feeling very sad lately. What should I do?",
   "history": []
 }
 ```
-Response: `{"language": "fr"}`
 
-### Detect Emotion
-**POST** `/detect-emotion`
-```json
-{
-  "text": "I'm feeling really overwhelmed and anxious today.",
-  "history": []
-}
-```
-Response: `{"emotion": "fear"}`
-
-### Classify Intent
-**POST** `/classify-intent`
-```json
-{
-  "text": "What can I do about my depression?",
-  "history": []
-}
-```
-Response: `{"intent": "asking_mental_health_question"}`
-
-### Chat (Main Endpoint)
-**POST** `/chat`
-```json
-{
-  "text": "I've been feeling very sad lately. What should I do?",
-  "history": []
-}
-```
 Response:
 ```json
 {
@@ -188,3 +284,44 @@ Response:
 }
 ```
 
+### POST /feedback
+
+Accepts user feedback on bot responses. Used by the frontend thumbs up/down buttons.
+
+Request:
+```json
+{
+  "vote": "up",
+  "user_message": "I feel anxious",
+  "bot_response": "I hear you..."
+}
+```
+
+Response:
+```json
+{"status": "ok"}
+```
+
+### POST /detect-language
+
+```json
+{"message": "Bonjour, comment allez-vous?", "history": []}
+```
+
+Response: `{"language": "fr"}`
+
+### POST /detect-emotion
+
+```json
+{"message": "I am feeling really overwhelmed and anxious today.", "history": []}
+```
+
+Response: `{"emotion": "fear"}`
+
+### POST /classify-intent
+
+```json
+{"message": "What can I do about my depression?", "history": []}
+```
+
+Response: `{"intent": "asking_mental_health_question"}`

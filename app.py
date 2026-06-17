@@ -1,5 +1,5 @@
-import streamlit as st
 import requests
+import streamlit as st
 
 API_URL = "http://127.0.0.1:8000"
 
@@ -45,15 +45,12 @@ if user_input:
             try:
                 response = requests.post(
                     f"{API_URL}/chat",
-                    json={
-                        "text": user_input,
-                        "history": history
-                    },
-                    timeout=60
+                    json={"message": user_input, "history": history},
+                    timeout=60,
                 )
                 data = response.json()
                 answer = data.get("response", "Sorry, something went wrong.")
-                
+
                 st.write(answer)
                 st.caption(
                     f"Language: `{data.get('language', '')}` | "
@@ -62,16 +59,20 @@ if user_input:
                 )
 
                 # Save to session state
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": answer,
-                    "language": data.get("language", "")
-                })
-                st.session_state.meta.append({
-                    "language": data.get("language", ""),
-                    "emotion" : data.get("emotion", ""),
-                    "intent"  : data.get("intent", "")
-                })
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": answer,
+                        "language": data.get("language", ""),
+                    }
+                )
+                st.session_state.meta.append(
+                    {
+                        "language": data.get("language", ""),
+                        "emotion": data.get("emotion", ""),
+                        "intent": data.get("intent", ""),
+                    }
+                )
 
             except Exception as e:
                 st.error(f"Could not reach the API: {e}")
@@ -80,5 +81,5 @@ if user_input:
 if st.session_state.messages:
     if st.button("Clear conversation"):
         st.session_state.messages = []
-        st.session_state.meta     = []
+        st.session_state.meta = []
         st.rerun()

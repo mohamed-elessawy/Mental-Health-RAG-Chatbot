@@ -1,0 +1,172 @@
+Axiom Dashboard Queries — Serenity Mental Health API
+=====================================================
+
+Datasets (from deployment/.env):
+  - Traces  → serenity-traces
+  - Metrics → serenity-metrics
+  - Logs    → serenity-logs
+  - Service → serenity-mental-health-api
+
+Note: Field names may differ slightly in Axiom. If a query fails, check the
+field browser on serenity-traces for exact names (e.g. attributes.http.route).
+
+
+TRACES DATASET (serenity-traces)
+--------------------------------
+
+1. Total requests over time
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where ['attributes.http.route'] != "/health"
+| summarize count() by bin(_time, 5m)
+
+
+2. Requests per endpoint
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where isnotnull(['attributes.http.route'])
+| summarize count() by ['attributes.http.route']
+| order by count_ desc
+
+
+3. Average latency per endpoint (ms)
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where isnotnull(['attributes.http.route'])
+| summarize avg(duration) by ['attributes.http.route']
+| extend avg_ms = avg_duration * 1000
+| order by avg_ms desc
+
+
+4. P95 latency per endpoint (ms)
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where isnotnull(['attributes.http.route'])
+| summarize percentile(duration, 95) by ['attributes.http.route']
+| extend p95_ms = percentile_duration_95 * 1000
+| order by p95_ms desc
+
+
+5. Error rate (4xx + 5xx)
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where ['attributes.http.status_code'] >= 400
+| summarize error_count = count() by bin(_time, 5m), ['attributes.http.status_code']
+
+
+6. Status code breakdown
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| summarize count() by ['attributes.http.status_code']
+| order by count_ desc
+
+
+7. /chat endpoint latency over time
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where ['attributes.http.route'] == "/chat"
+| summarize avg(duration), percentile(duration, 95) by bin(_time, 5m)
+| extend avg_ms = avg_duration * 1000, p95_ms = percentile_duration_95 * 1000
+
+
+8. Slowest requests (top 20)
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where duration > 1
+| project _time, name, ['attributes.http.method'], ['attributes.http.route'], ['attributes.http.status_code'], duration, trace_id
+| extend duration_ms = duration * 1000
+| order by duration desc
+| take 20
+
+
+9. Outbound calls (LLM / Qdrant via httpx)
+['serenity-traces']
+| where ['service.name'] == "serenity-mental-health-api"
+| where name contains "HTTP" or name contains "httpx"
+| summarize count(), avg(duration) by name
+| extend avg_ms = avg_duration * 1000
+| order by count_ desc
+
+
+METRICS DATASET (serenity-metrics)
+----------------------------------
+
+10. Request count over time
+['serenity-metrics']
+| where name == "http.server.request.count"
+| summarize sum(value) by bin(_time, 5m)
+
+
+11. Request count by route
+['serenity-metrics']
+| where name == "http.server.request.count"
+| summarize sum(value) by ['attributes.http.route']
+| order by sum_value desc
+
+
+12. Avg request duration by route (seconds)
+['serenity-metrics']
+| where name == "http.server.request.duration"
+| summarize avg(value) by ['attributes.http.route']
+| order by avg_value desc
+
+
+13. Active requests (live load)
+['serenity-metrics']
+| where name == "http.server.active_requests"
+| summarize max(value) by bin(_time, 1m)
+
+
+14. Error requests (status >= 400)
+['serenity-metrics']
+| where name == "http.server.request.count"
+| where ['attributes.http.status_code'] >= 400
+| summarize sum(value) by bin(_time, 5m), ['attributes.http.status_code']
+
+
+LOGS DATASET (serenity-logs)
+----------------------------
+
+15. Error logs over time
+['serenity-logs']
+| where severity_text == "ERROR" or level == "ERROR"
+| summarize count() by bin(_time, 5m)
+
+
+16. Recent errors (last 50)
+['serenity-logs']
+| where severity_text == "ERROR" or level == "ERROR"
+| project _time, body, ['attributes.code.file.path'], trace_id
+| order by _time desc
+| take 50
+
+
+17. Chat pipeline logs
+['serenity-logs']
+| where body contains "Chat request" or body contains "Intent:" or body contains "Emotion:" or body contains "Language:"
+| project _time, body, trace_id
+| order by _time desc
+| take 100
+
+
+18. RAG / LLM failures
+['serenity-logs']
+| where body contains "failed" or body contains "RAG pipeline" or body contains "LLM call"
+| project _time, body, trace_id
+| order by _time desc
+| take 50
+
+
+SUGGESTED DASHBOARD PANELS
+--------------------------
+
+Panel              | Query # | Chart type
+-------------------|---------|------------
+Requests/min       | 1       | Time series
+Latency by endpoint| 3 or 4  | Bar chart
+/chat latency      | 7       | Time series
+Error rate         | 5 or 14 | Time series
+Status codes       | 6       | Pie / bar
+Active requests    | 13      | Time series
+Error logs         | 15      | Time series
+Slow requests      | 8       | Table
