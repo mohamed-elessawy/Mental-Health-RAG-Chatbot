@@ -1,3 +1,12 @@
+---
+title: Serenity Backend
+emoji: 🧠
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # Mental Health RAG Chatbot
 
 A conversational AI chatbot for mental health support combining Retrieval-Augmented Generation (RAG) and advanced NLP techniques. The system understands the user's language, detects their emotional state, classifies their intent, and generates empathetic responses using a curated knowledge base of real counseling conversations.
