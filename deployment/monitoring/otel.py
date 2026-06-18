@@ -17,9 +17,10 @@ from opentelemetry.sdk.resources import (
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+from deployment.core.logging import setup_logging
 from deployment.monitoring.config import OtelSettings
 
-logger = logging.getLogger("serenity.monitoring")
+logger = setup_logging()
 
 
 def _build_resource(settings: OtelSettings) -> Resource:
