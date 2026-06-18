@@ -99,21 +99,21 @@ jobs:
         run: |
           # 1. Completely delete the Git tracking folder inside the runner
           rm -rf .git
-          
+
           # 2. Re-initialize a brand new, empty Git environment
           git init -b main
-          
+
           # 3. Configure the temporary automation identity
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          
+
           # 4. Stage everything EXCEPT the outputs folder
           git add .
-          git rm -rf --cached outputs/ || true
-          
+          git rm -rf --cached outputs/ notebooks/ models/ || true
+
           # 5. Commit it as a single, fresh deployment commit
           git commit -m "deploy: initial clean release to hugging face"
-          
+
           # 6. Force push this single clean commit to Hugging Face
           git push -f \
             "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}" \
