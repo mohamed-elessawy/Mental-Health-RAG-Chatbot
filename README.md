@@ -211,7 +211,7 @@ Because of this, a code-only change reuses the cached layers and only the final 
 rebuilds. In practice **7 of the 8 build steps are cache hits** on a code change, as shown
 below:
 
-![Docker Layer Cache Verification](assets\cached_build.png)
+![Docker Layer Cache Verification](assets/cached_build.png)
 
 ---
 
@@ -380,7 +380,7 @@ We also export these supporting metrics, with the same reasoning broken out:
 
 ### Axiom dashboard
 
-![Axiom metrics dashboard](assets\dashboard.png)
+![Axiom metrics dashboard](assets/dashboard.png)
 
 | Panel | Metric | Category |
 |-------|--------|----------|
