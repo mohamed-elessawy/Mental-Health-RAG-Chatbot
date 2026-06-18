@@ -10,24 +10,18 @@ venv/
 .coverage
 __pycache__/
 
-notebooks/
-outputs/
-models/
+assets/
 
 *.pyc
 *.log
 *.ipynb
 
 
-app.py
-requirements.txt
 .python-version
 .pre-commit-config.yaml
-conftest.py
-test_results.txt
-dashboard.png
-Cached_build.png
 
+models/
 deployment/tests/
 deployment/.env
 deployment/.env.example
+README.md

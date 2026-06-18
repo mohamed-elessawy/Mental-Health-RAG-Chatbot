@@ -38,7 +38,5 @@ models/*
 
 # this file includes the results of the tests, saved locally for reference.
 test_results.txt
-Cached_build.png
-dashboard.png
 
 .vscode/

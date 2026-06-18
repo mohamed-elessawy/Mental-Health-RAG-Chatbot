@@ -1,7 +1,0 @@
-{
-  "best_model": "model_2_char_only",
-  "test_accuracy": 0.9956,
-  "n_train": 70000,
-  "n_test": 10000,
-  "n_languages": 20
-}
