@@ -1,83 +1,155 @@
-# Deployment Guide
+---
+title: Serenity Backend
+emoji: 🧠
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+pinned: false
+---
 
-This directory contains the production backend for the Mental Health RAG Chatbot.
-It implements a FastAPI application that orchestrates the 4-module NLP pipeline
-and exposes HTTP endpoints for inference.
+# Serenity: Mental Health Support Chatbot (Backend)
+
+Production backend for **Serenity**, a mental health support chatbot. It is a FastAPI
+application that orchestrates a multi-stage NLP pipeline (language detection → intent
+classification → translation → emotion detection → RAG retrieval → empathetic response
+generation) and exposes HTTP endpoints consumed by the provided chat frontend.
 
 ---
 
-## Live Deployment
+## Deliverables
 
-The backend API is publicly accessible at:
-**`https://alaasrour-serenity-backend.hf.space`**
+| Item | Link |
+|------|------|
+| Backend repo (`mlops` branch) | https://github.com/mohamed-elessawy/Mental-Health-RAG-Chatbot/tree/mlops |
+| Deployed API (Hugging Face Space) | https://alaasrour-serenity-backend.hf.space |
+| Forked frontend repo | https://github.com/mohamed-elessawy/chatbot-frontend |
+| Deployed frontend (GitHub Pages) | https://mohamed-elessawy.github.io/chatbot-frontend/ |
+| Docker layer cache verification | [cached_build.png](/assets/cached_build.png) |
+| Monitoring dashboard screenshot | [dashboard.png](/assets/dashboard.png) |
 
-## CI/CD Pipeline
+### A note on the `mlops` branch
 
-The pipeline is defined in `.github/workflows/ci.yml` and runs automatically on every push to `main`.
+This project lives on the **`mlops` branch**, and CI/CD runs on pushes to `mlops`.
 
-### Pipeline Stages
+The `main` branch holds the full original NLP project: training notebooks, datasets,
+model artifacts, and experiment outputs. Those folders are not appropriate to ship as an
+MLOps production backend (large, non-deployable, and noisy for a grader). We developed
+and merged everything on `main` while building the project, then later carved out this
+clean, deployment-only backend onto the `mlops` branch. **Treat `mlops` as the
+deliverable branch for this submission.**
+
+---
+
+## NLP Approach & Design Decisions
+
+The `/chat` request flows through a sequence of focused stages, each isolated in its own
+service module under [deployment/services/](services/):
+
+1. **Language detection**: a TF-IDF + LinearSVC scikit-learn model
+   ([deployment/services/language_detection.py](services/language_detection.py)). For very
+   short messages (≤3 words) we *stick* to the last detected language from history, since
+   short inputs like "ok" are unreliable to classify.
+2. **Intent classification**: zero-shot LLM prompting via Groq
+   ([deployment/services/intent_classifier.py](services/intent_classifier.py)), temperature
+   0 for determinism. Labels: `greeting`, `goodbye`, `gratitude`,
+   `asking_mental_health_question`, `out_of_scope`. Any unrecognized label is mapped to
+   `out_of_scope` so the bot fails safe.
+3. **Non-RAG intents** (greeting / goodbye / gratitude / out-of-scope) get a short,
+   on-brand reply from a system prompt, with no retrieval and no wasted latency.
+4. **Translation to English** (skipped for English input) so retrieval and generation run
+   in one consistent language ([deployment/services/translation.py](services/translation.py)).
+5. **Emotion detection**: a fine-tuned DistilBERT 6-class classifier (sadness, joy, love,
+   anger, fear, surprise) so the response can be emotion-aware
+   ([deployment/services/emotion_detection.py](services/emotion_detection.py)).
+6. **RAG** ([deployment/services/rag_service.py](services/rag_service.py)):
+   - *Query rewriting* extracts personal context and a focused search query.
+   - *Retrieval* runs a dense vector search over a mental-health Q&A knowledge base in
+     **Qdrant**, embedded with `all-MiniLM-L6-v2` (sentence-transformers).
+   - *Generation* feeds retrieved references + detected emotion + personal context + recent
+     history to the generation LLM, with explicit instructions to recommend professional
+     help if the user appears to be in crisis.
+7. **Translation back** to the user's language (skipped for English).
+
+**Why this design:** intent classification gates the expensive RAG path so greetings and
+out-of-scope messages stay cheap; retrieval grounds answers in real counselor responses
+rather than letting the LLM hallucinate; and emotion + personal context make replies feel
+empathetic rather than generic.
+
+**LLM provider:** Groq (via `litellm`), for fast, free-tier-friendly inference.
+**Vector DB:** Qdrant Cloud.
+
+### Edge cases handled
+
+- **Empty / whitespace messages** → rejected with `422` via a Pydantic validator
+  ([deployment/schemas/chat.py](schemas/chat.py)).
+- **Out-of-scope questions** → classified as `out_of_scope`, answered with a polite
+  boundary-setting reply instead of retrieval.
+- **Crisis / safety** → the generation system prompt instructs the model to surface
+  professional-help guidance when the user appears to be in distress.
+- **Invalid feedback votes** → only `up` / `down` accepted, else `422`.
+
+---
+
+## Repository Structure
+
+The backend lives entirely inside the `deployment/` folder on `main`:
 
 ```
-push to main
-     │
-     ▼
-1. Lint & Unit Tests  (ruff + pytest -m "not slow")
-     │  slow tests require real model inference and are excluded from CI
-     │  to keep the pipeline fast — run them locally with: pytest -v
-     │  fails → pipeline stops
-     ▼
-2. Build & Push Docker Image
-     │  builds linux/amd64 image, pushes to Docker Hub
-     │  tags: <sha> + latest
-     ▼
-3. Deploy to Hugging Face Spaces
-     │  git push --force → HF rebuilds the Space container
-     ▼
-Live at https://alaasrour-serenity-backend.hf.space
+📦 Mental-Health-RAG-Chatbot/   (main branch)
+└── 📁 deployment/
+    ├── 📁 api/
+    │   └── routes.py               # HTTP endpoints
+    ├── 📁 core/
+    │   ├── config.py               # Pydantic settings (loaded from .env)
+    │   └── logging.py              # Centralized "serenity" logger setup
+    ├── 📁 monitoring/
+    │   ├── app_metrics.py          # Custom NLP / data metrics
+    │   ├── config.py               # OpenTelemetry settings
+    │   ├── instrument.py           # Wires OTel into the FastAPI app
+    │   ├── middleware.py           # HTTP server metrics middleware
+    │   ├── otel.py                 # OTLP exporter setup (traces/metrics/logs)
+    │   └── axiom-dashboard-queries.txt
+    ├── 📁 schemas/
+    │   ├── chat.py                 # Request/response models + validators
+    │   └── prompts.py              # LLM prompt templates
+    ├── 📁 services/                # NLP pipeline (no HTTP dependencies)
+    │   ├── language_detection.py
+    │   ├── emotion_detection.py
+    │   ├── intent_classifier.py
+    │   ├── rag_service.py
+    │   └── translation.py
+    ├── 📁 tests/                   # pytest suite (slow model tests marked @pytest.mark.slow)
+    │   ├── __init__.py
+    │   ├── conftest.py             # Shared fixtures (mocked client, real-model loaders)
+    │   ├── test_emotion_detection.py
+    │   ├── test_endpoints.py
+    │   ├── test_intent_classifier.py
+    │   ├── test_language_detection.py
+    │   ├── test_rag_service.py
+    │   ├── test_schemas.py
+    │   └── test_translation.py
+    ├── .env.example
+    └── main.py                     # FastAPI entry point, CORS, lifespan, monitoring
 ```
 
-### Required GitHub Secrets & Variables
+> Model files (`models/`) are **not** committed. They are fetched from Google Drive at
+> Docker build time (and on first local run), so the repo stays light.
 
-Go to **GitHub repo → Settings → Secrets and variables → Actions** and add:
-
-**Secrets** (sensitive — never logged):
-
-| Name | Description |
-|------|-------------|
-| `DOCKERHUB_TOKEN` | Docker Hub access token |
-| `HF_TOKEN` | Hugging Face write token |
-
-**Variables** (non-sensitive — visible in logs):
-
-| Name | Description |
-|------|-------------|
-| `DOCKERHUB_USERNAME` | Your Docker Hub username |
-| `HF_USERNAME` | Your Hugging Face username |
-| `HF_SPACE` | Your HF Space name |
-
-
+---
 
 ## Quick Setup
 
-Prerequisites: Python 3.12+ and uv installed.
+Prerequisites: **Python 3.12+** and **uv** installed. Run all commands from the **repo
+root**.
 
-### 1. Install Dependencies
-
-From the root directory of the project:
-
-```bash
-uv sync
-```
-
-For development (includes test and lint tools):
+### 1. Install dependencies
 
 ```bash
-uv sync --dev
+uv sync            # runtime only
+uv sync --dev      # + test and lint tooling
 ```
 
-### 2. Configure Environment
-
-Copy the template and fill in your API keys:
+### 2. Configure environment
 
 ```bash
 cp deployment/.env.example deployment/.env
@@ -96,78 +168,64 @@ GENERATION_LLM_MODEL=groq/openai/gpt-oss-120b
 RETRIEVAL_TOP_K=3
 EMBED_MODEL=all-MiniLM-L6-v2
 LOG_LEVEL=INFO
-ALLOWED_ORIGINS=["*"]
+ALLOWED_ORIGINS=["https://mohamed-elessawy.github.io","http://localhost:8501"]
 ```
 
 ---
 
 ## Running the System
 
-### Backend (FastAPI)
-
-From the root directory:
+From the repo root:
 
 ```bash
 uv run uvicorn deployment.main:app --reload
 ```
 
-First run takes a few minutes while models download from Google Drive.
-
-### Frontend (Streamlit)
-
-In a separate terminal:
-
-```bash
-uv run streamlit run app.py
-```
-
-Opens at http://localhost:8501.
+The API serves on `http://127.0.0.1:8000` (interactive docs at `/docs`). First run takes a
+few minutes while models download from Google Drive.
 
 ---
 
 ## Running with Docker
 
-A `Dockerfile` is provided at the project root. It installs CPU-only PyTorch and
-bakes the language detector and emotion model into the image at build time, so
-no Google Drive download is needed at container startup.
-
-### Build the image
-
-From the root directory:
+The `Dockerfile` at the repo root installs CPU-only PyTorch and bakes the language
+detector and emotion model into the image at build time, so no Google Drive download is
+needed at container startup. The container listens on port **7860** (the Hugging Face
+Spaces convention).
 
 ```bash
 docker build -t mental-health-chatbot .
+docker run --env-file deployment/.env -p 8000:7860 mental-health-chatbot
 ```
 
-### Run the container
+The API is then available at `http://localhost:8000`.
 
-```bash
-docker run --env-file deployment/.env -p 8000:8000 mental-health-chatbot
-```
+### Layer caching
 
-The API is then available at http://localhost:8000.
+The Dockerfile is ordered so the expensive steps come first and the application code is
+copied last. Dependencies (`uv sync`), the Google Drive model download, and the
+sentence-transformers embedding download all live above the `COPY` of the app source.
+Because of this, a code-only change reuses the cached layers and only the final copy step
+rebuilds. In practice **7 of the 8 build steps are cache hits** on a code change, as shown
+below:
+
+![Docker Layer Cache Verification](/assets/cached_build.png)
 
 ---
 
 ## Running Tests
 
-Fast tests only (no model loading, suitable for CI):
+From the repo root:
 
 ```bash
-uv run pytest -v -m "not slow"
+uv run pytest -v -m "not slow"                                       # fast, CI-equivalent
+uv run pytest -v                                                     # all tests incl. real models
+uv run pytest --cov=deployment --cov-report=term-missing -v          # with coverage
 ```
 
-All tests including real model inference:
-
-```bash
-uv run pytest -v
-```
-
-With coverage report:
-
-```bash
-uv run pytest --cov=deployment --cov-report=term-missing -v
-```
+Latest full local run (including live models): **79 passed, ~95% coverage** (800
+statements, 39 missed). Slow tests load real models and are excluded from CI to keep the
+pipeline fast.
 
 ---
 
@@ -182,54 +240,32 @@ uv run pre-commit run --all-files
 
 ---
 
-## Directory Structure
+## CI/CD Pipeline
+
+Defined in `.github/workflows/ci.yml` and runs on every push to the **`mlops`** branch
+(see the branch note above). The Docker build step reuses the GitHub Actions layer cache
+(see [Layer caching](#layer-caching) above).
 
 ```
-📁 deployment
-├── 📁 api
-│   └── routes.py
-├── 📁 core
-│   ├── config.py
-│   └── logging.py
-├── 📁 schemas
-│   ├── chat.py
-│   └── prompts.py
-├── 📁 services
-│   ├── emotion_detection.py
-│   ├── intent_classifier.py
-│   ├── language_detection.py
-│   ├── rag_service.py
-│   └── translation.py
-├── 📁 tests
-│   ├── conftest.py
-│   ├── test_emotion_detection.py
-│   ├── test_endpoints.py
-│   ├── test_intent_classifier.py
-│   ├── test_language_detection.py
-│   ├── test_rag_service.py
-│   ├── test_schemas.py
-│   └── test_translation.py
-├── .env.example
-├── main.py
-└── README.md
+push to mlops
+     |
+     v
+1. Lint & Unit Tests   (ruff check + ruff format --check + pytest -m "not slow")
+     |  fails -> pipeline stops
+     v
+2. Build & Push Docker Image
+     |  linux/amd64, GitHub Actions layer cache, pushed to Docker Hub (<sha> + latest)
+     v
+3. Deploy to Hugging Face Spaces
+     |  force-push the repo -> HF rebuilds the Space container
+     v
+Live at https://alaasrour-serenity-backend.hf.space
 ```
 
-### File Descriptions
+### Required GitHub Secrets & Variables
 
-| Item | Purpose |
-|------|---------|
-| main.py | FastAPI entry point. Loads models on startup, configures CORS and logging. |
-| api/routes.py | HTTP endpoints: /chat, /feedback, /health, /detect-language, /detect-emotion, /classify-intent. |
-| core/config.py | Configuration via Pydantic BaseSettings. Loads from .env file. |
-| core/logging.py | Centralized logger setup for the serenity logger hierarchy. |
-| schemas/chat.py | Pydantic models: ChatRequest, ChatResponse, FeedbackRequest, FeedbackResponse. Includes input validation. |
-| schemas/prompts.py | Prompt templates for intent classification, query rewriting, translation, response generation, and non-RAG replies. |
-| services/language_detection.py | Language detection using a TF-IDF + LinearSVC pipeline. Auto-downloads from Google Drive. |
-| services/emotion_detection.py | Emotion classification using fine-tuned DistilBERT. Auto-downloads from Google Drive. |
-| services/intent_classifier.py | Intent classification via zero-shot LLM prompting through Groq. |
-| services/rag_service.py | RAG pipeline: query rewriting, Qdrant retrieval, LLM response generation. |
-| services/translation.py | Bidirectional translation via Groq LLM. Skips translation for English input/output. |
-| tests/ | Unit and integration tests. Slow tests (real models) marked with @pytest.mark.slow. |
+**Secrets:** `DOCKERHUB_TOKEN`, `HF_TOKEN`
+**Variables:** `DOCKERHUB_USERNAME`, `HF_USERNAME`, `HF_SPACE`
 
 ---
 
@@ -237,25 +273,23 @@ uv run pre-commit run --all-files
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| GROQ_API_KEY | Yes | API key from console.groq.com. Used by litellm for all LLM calls. |
-| QDRANT_API_KEY | Yes | API key from Qdrant Cloud. |
-| QDRANT_URL | Yes | Qdrant cluster endpoint. |
-| INTENT_LLM_MODEL | No | LLM for intent classification and query rewriting. Default: groq/llama-3.1-8b-instant |
-| GENERATION_LLM_MODEL | No | LLM for response generation. Default: groq/openai/gpt-oss-120b |
-| RETRIEVAL_TOP_K | No | Number of documents to retrieve. Default: 3 |
-| EMBED_MODEL | No | Sentence embedding model. Default: all-MiniLM-L6-v2 |
-| LOG_LEVEL | No | Logging verbosity. Default: INFO |
-| ALLOWED_ORIGINS | No | CORS allowed origins list. Default: ["*"] |
+| `GROQ_API_KEY` | Yes | Groq API key. Used by litellm for all LLM calls. |
+| `QDRANT_API_KEY` | Yes | Qdrant Cloud API key. |
+| `QDRANT_URL` | Yes | Qdrant cluster endpoint. |
+| `INTENT_LLM_MODEL` | No | LLM for intent classification + query rewriting. Default: `groq/llama-3.1-8b-instant` |
+| `GENERATION_LLM_MODEL` | No | LLM for response generation. Default: `groq/openai/gpt-oss-120b` |
+| `RETRIEVAL_TOP_K` | No | Number of documents to retrieve. Default: `3` |
+| `EMBED_MODEL` | No | Sentence embedding model. Default: `all-MiniLM-L6-v2` |
+| `LOG_LEVEL` | No | Logging verbosity. Default: `INFO` |
+| `ALLOWED_ORIGINS` | No | CORS allowed origins (JSON list). Default: GitHub Pages frontend + localhost |
 
 ---
 
 ## API Endpoints
 
-Interactive API explorer available at http://127.0.0.1:8000/docs when the backend is running.
+Interactive explorer at `http://127.0.0.1:8000/docs` when the backend is running.
 
 ### GET /health
-
-Returns service status and whether all models are loaded.
 
 ```json
 {"status": "healthy", "models_loaded": true}
@@ -263,14 +297,9 @@ Returns service status and whether all models are loaded.
 
 ### POST /chat
 
-Main endpoint. Accepts a message, runs the full pipeline, returns a response.
-
 Request:
 ```json
-{
-  "message": "I have been feeling very sad lately. What should I do?",
-  "history": []
-}
+{ "message": "I have been feeling very sad lately. What should I do?", "history": [] }
 ```
 
 Response:
@@ -286,15 +315,9 @@ Response:
 
 ### POST /feedback
 
-Accepts user feedback on bot responses. Used by the frontend thumbs up/down buttons.
-
 Request:
 ```json
-{
-  "vote": "up",
-  "user_message": "I feel anxious",
-  "bot_response": "I hear you..."
-}
+{ "vote": "up", "user_message": "I feel anxious", "bot_response": "I hear you..." }
 ```
 
 Response:
@@ -302,70 +325,67 @@ Response:
 {"status": "ok"}
 ```
 
-### POST /detect-language
+### Utility endpoints
 
-```json
-{"message": "Bonjour, comment allez-vous?", "history": []}
-```
-
-Response: `{"language": "fr"}`
-
-### POST /detect-emotion
-
-```json
-{"message": "I am feeling really overwhelmed and anxious today.", "history": []}
-```
-
-Response: `{"emotion": "fear"}`
-
-### POST /classify-intent
-
-```json
-{"message": "What can I do about my depression?", "history": []}
-```
-
-Response: `{"intent": "asking_mental_health_question"}`
+- `POST /detect-language` → `{"language": "fr"}`
+- `POST /detect-emotion` → `{"emotion": "fear"}`
+- `POST /classify-intent` → `{"intent": "asking_mental_health_question"}`
 
 ---
 
-## System Monitoring
+## Monitoring
 
-The API is instrumented with [OpenTelemetry](https://opentelemetry.io/) and exports traces, metrics, and logs directly to [Axiom](https://axiom.co). See [monitoring/README.md](monitoring/README.md) for full setup.
+The API is instrumented with **OpenTelemetry** and exports traces, metrics, and logs
+directly to [Axiom](https://axiom.co) over OTLP/HTTP. No separate Collector container is
+required.
+
+### Enable monitoring
 
 Add to `deployment/.env`:
 
 ```dotenv
 OTEL_ENABLED=true
 AXIOM_TOKEN=your_axiom_api_token
+OTEL_SERVICE_NAME=serenity-mental-health-api
+OTEL_SERVICE_VERSION=0.1.0
+OTEL_DEPLOYMENT_ENVIRONMENT=development
 ```
 
-Run the instrumented API:
+Then run the API normally (`uv run uvicorn deployment.main:app`); instrumentation is wired
+into `deployment/main.py` and activates from the env vars above.
 
-```bash
-uvicorn deployment.main_otel:app --reload
-```
+### The three chosen metrics
 
-### Three chosen metrics and reasoning
+These are the three required metrics, one per layer:
 
 | # | Category | Metric | Recorded when | Why we track it |
 |---|----------|--------|---------------|-----------------|
-| 1 | **Model / NLP** | `nlp.intent.classified` | After intent classification on `/chat` | Shows user intent distribution; spikes in `out_of_scope` may indicate prompt issues or misuse |
-| 2 | **Data** | `data.chat.message.length` | On every `/chat` request | Detects abnormal input sizes (very short bot-like messages or very long abuse/injection attempts) |
-| 3 | **Server** | `http.server.request.count` | On every HTTP request via middleware | Tracks request volume; `http.status_code` attribute enables per-route error rate |
+| 1 | **Model / NLP** | `nlp.intent.classified` | After intent classification on `/chat` | Shows the user-intent distribution. A spike in `out_of_scope` flags prompt issues or misuse, and the mix of intents tells us what users actually come to the bot for. |
+| 2 | **Data** | `data.chat.message.length` | On every `/chat` request | Detects abnormal input sizes. Very short or empty messages can signal bot-like spam, while very long ones often indicate abuse or prompt-injection attempts. |
+| 3 | **Server** | `http.server.request.count` | On every HTTP request (middleware) | Tracks request volume and availability. The `http.status_code` attribute lets us derive per-route error rate. |
 
-Additional signals: `data.feedback.vote` (thumbs up/down), `http.server.request.duration`, `server.process.uptime`.
+### Additional signals
+
+We also export these supporting metrics, with the same reasoning broken out:
+
+| Category | Metric | Recorded when | Why we track it |
+|----------|--------|---------------|-----------------|
+| **Data** | `data.feedback.vote` | When the frontend posts to `/feedback` | Captures the thumbs up / down ratio, our most direct signal of whether responses are actually helpful. |
+| **Server** | `http.server.request.duration` | On every HTTP request (middleware) | Latency distribution per route, used to catch slow LLM or retrieval calls degrading the user experience. |
+| **Server** | `http.server.active_requests` | Incremented/decremented around each request | Live concurrency, which shows load spikes and whether the service is keeping up. |
+| **Server** | `server.process.uptime` | Sampled by an observable gauge | Seconds since process start, a simple health and restart-detection signal. |
 
 ### Axiom dashboard
 
-![Axiom metrics dashboard](monitoring/dashboard/dashboard_metrics.png)
+![Axiom metrics dashboard](/assets/dashboard.png)
 
-| Panel | Metric | Category | Why we track it |
-|-------|--------|----------|-----------------|
-| Intent Classification Rate | `nlp.intent.classified` | Model / NLP | How users interact with the bot |
-| Message Length | `data.chat.message.length` | Data | Input quality and abuse detection |
-| Request Volume Over Time | `http.server.request.count` | Server | Load and availability |
-| User Feedback Volume | `data.feedback.vote` | Data | Response satisfaction |
-| Concurrent Requests Trend | `http.server.active_requests` | Server | Live concurrency |
-| Process Uptime History | `server.process.uptime` | Server | Service health |
+| Panel | Metric | Category |
+|-------|--------|----------|
+| Intent Classification Rate | `nlp.intent.classified` | Model / NLP |
+| Message Length | `data.chat.message.length` | Data |
+| Request Volume Over Time | `http.server.request.count` | Server |
+| User Feedback Volume | `data.feedback.vote` | Data |
+| Concurrent Requests | `http.server.active_requests` | Server |
+| Process Uptime | `server.process.uptime` | Server |
 
-MPL dashboard queries: [monitoring/axiom-dashboard-queries.txt](monitoring/axiom-dashboard-queries.txt)
+Dashboard queries: [deployment/monitoring/axiom-dashboard-queries.txt](monitoring/axiom-dashboard-queries.txt)
