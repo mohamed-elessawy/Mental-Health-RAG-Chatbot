@@ -1,3 +1,12 @@
+---
+title: Serenity Backend
+emoji: 🧠
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # Serenity: Mental Health Support Chatbot (Backend)
 
 Production backend for **Serenity**, a mental health support chatbot. It is a FastAPI
