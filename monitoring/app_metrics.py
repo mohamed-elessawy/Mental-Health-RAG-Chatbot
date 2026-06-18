@@ -15,8 +15,6 @@ _app_metrics: AppMetricsProtocol | None = None
 class AppMetricsProtocol(Protocol):
     def record_intent(self, intent: str) -> None: ...
 
-    def record_rag_scores(self, scores: list[float]) -> None: ...
-
     def record_message_length(self, length: int) -> None: ...
 
     def record_feedback(self, vote: str) -> None: ...
@@ -24,9 +22,6 @@ class AppMetricsProtocol(Protocol):
 
 class _NoOpAppMetrics:
     def record_intent(self, intent: str) -> None:
-        return None
-
-    def record_rag_scores(self, scores: list[float]) -> None:
         return None
 
     def record_message_length(self, length: int) -> None:
@@ -44,11 +39,6 @@ class AppMetrics:
             name="nlp.intent.classified",
             unit="1",
             description="Count of classified user intents",
-        )
-        self._rag_score_histogram = meter.create_histogram(
-            name="nlp.rag.retrieval.score",
-            unit="1",
-            description="Cosine similarity scores from Qdrant vector retrieval",
         )
         self._message_length_histogram = meter.create_histogram(
             name="data.chat.message.length",
@@ -73,10 +63,6 @@ class AppMetrics:
 
     def record_intent(self, intent: str) -> None:
         self._intent_counter.add(1, {"intent": intent})
-
-    def record_rag_scores(self, scores: list[float]) -> None:
-        for score in scores:
-            self._rag_score_histogram.record(score)
 
     def record_message_length(self, length: int) -> None:
         self._message_length_histogram.record(length)

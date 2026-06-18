@@ -31,7 +31,7 @@ def test_health_returns_healthy_when_models_loaded(client):
 
 def test_health_returns_degraded_when_models_missing(client):
     """If a model failed to load, health should report degraded."""
-    with patch("deployment.services.emotion_detection.model", None):
+    with patch("services.emotion_detection.model", None):
         response = client.get("/health")
         body = response.json()
         assert body["status"] == "degraded"
@@ -115,10 +115,10 @@ def test_chat_greeting(client):
     )
     with (
         patch(
-            "deployment.api.routes.classify_user_intent",
+            "api.routes.classify_user_intent",
             return_value="greeting",
         ),
-        patch("deployment.api.routes.litellm.completion", return_value=mock_response),
+        patch("api.routes.litellm.completion", return_value=mock_response),
     ):
         response = client.post("/chat", json={"message": "Hello!"})
         body = response.json()
@@ -141,10 +141,10 @@ def test_chat_out_of_scope(client):
     )
     with (
         patch(
-            "deployment.api.routes.classify_user_intent",
+            "api.routes.classify_user_intent",
             return_value="out_of_scope",
         ),
-        patch("deployment.api.routes.litellm.completion", return_value=mock_response),
+        patch("api.routes.litellm.completion", return_value=mock_response),
     ):
         response = client.post("/chat", json={"message": "What is the weather today?"})
         body = response.json()
@@ -184,7 +184,7 @@ def test_chat_wrong_http_method(client):
 def test_chat_rag_failure_returns_500(client):
     """If RAG pipeline throws, the error should propagate."""
     with patch(
-        "deployment.api.routes.rag_answer",
+        "api.routes.rag_answer",
         side_effect=RuntimeError("Qdrant connection lost"),
     ):
         with pytest.raises(RuntimeError, match="Qdrant connection lost"):

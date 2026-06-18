@@ -9,7 +9,7 @@ for catching validation edge cases.
 import pytest
 from pydantic import ValidationError
 
-from deployment.schemas.chat import ChatRequest, FeedbackRequest
+from schemas.chat import ChatRequest, FeedbackRequest
 
 # ---- ChatRequest ----
 

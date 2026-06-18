@@ -1,7 +1,7 @@
 import litellm
 
-from deployment.core.config import config
-from deployment.schemas.prompts import get_intent_classification_prompt
+from core.config import config
+from schemas.prompts import get_intent_classification_prompt
 
 
 def classify_user_intent(user_message: str, history: list | None = None) -> str:

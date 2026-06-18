@@ -7,7 +7,7 @@ because model loading takes several seconds.
 
 import pytest
 
-from deployment.services.language_detection import detect_user_language
+from services.language_detection import detect_user_language
 
 
 @pytest.mark.slow
@@ -23,11 +23,11 @@ class TestLanguageDetection:
         assert result == "en"
 
     def test_detect_arabic(self, language_model):
-        result = detect_user_language("أنا أشعر بالقلق الشديد")
+        result = detect_user_language("Ø£Ù†Ø§ Ø£Ø´Ø¹Ø± Ø¨Ø§Ù„Ù‚Ù„Ù‚ Ø§Ù„Ø´Ø¯ÙŠØ¯")
         assert result == "ar"
 
     def test_detect_french(self, language_model):
-        result = detect_user_language("Je me sens très triste aujourd'hui")
+        result = detect_user_language("Je me sens trÃ¨s triste aujourd'hui")
         assert result == "fr"
 
     def test_detect_spanish(self, language_model):
@@ -35,7 +35,7 @@ class TestLanguageDetection:
         assert result == "es"
 
     def test_detect_german(self, language_model):
-        result = detect_user_language("Ich fühle mich sehr einsam und traurig")
+        result = detect_user_language("Ich fÃ¼hle mich sehr einsam und traurig")
         assert result == "de"
 
     def test_returns_string(self, language_model):
@@ -58,7 +58,7 @@ class TestLanguageDetection:
 
     def test_model_not_loaded_raises(self):
         """If someone calls detect without loading, it should raise."""
-        import deployment.services.language_detection as lang_mod
+        import services.language_detection as lang_mod
 
         original = lang_mod._model
         lang_mod._model = None

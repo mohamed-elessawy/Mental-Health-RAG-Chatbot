@@ -10,11 +10,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from deployment.schemas.prompts import (
+from schemas.prompts import (
     get_generation_system_prompt,
     get_query_rewrite_prompt,
 )
-from deployment.services.rag_service import (
+from services.rag_service import (
     generate_response,
     rag_answer,
     retrieve_documents,
@@ -30,7 +30,7 @@ class TestRewriteQuery:
         return mock_response
 
     def test_extracts_context_and_query(self):
-        with patch("deployment.services.rag_service.litellm.completion") as mock:
+        with patch("services.rag_service.litellm.completion") as mock:
             mock.return_value = self._mock_rewrite_response(
                 "female, in a relationship",
                 "coping with anxiety in relationships",
@@ -40,7 +40,7 @@ class TestRewriteQuery:
             assert context == "female, in a relationship"
 
     def test_no_context_found(self):
-        with patch("deployment.services.rag_service.litellm.completion") as mock:
+        with patch("services.rag_service.litellm.completion") as mock:
             mock.return_value = self._mock_rewrite_response(
                 "none", "dealing with general anxiety"
             )
@@ -49,7 +49,7 @@ class TestRewriteQuery:
             assert len(query) > 0
 
     def test_llm_failure_propagates(self):
-        with patch("deployment.services.rag_service.litellm.completion") as mock:
+        with patch("services.rag_service.litellm.completion") as mock:
             mock.side_effect = RuntimeError("API timeout")
             with pytest.raises(RuntimeError):
                 rewrite_query("test message")
@@ -68,8 +68,8 @@ class TestRetrieveDocuments:
         mock_results.points = [mock_point]
 
         with (
-            patch("deployment.services.rag_service.embedder") as mock_embedder,
-            patch("deployment.services.rag_service.qdrant") as mock_qdrant,
+            patch("services.rag_service.embedder") as mock_embedder,
+            patch("services.rag_service.qdrant") as mock_qdrant,
         ):
             mock_embedder.encode.return_value.tolist.return_value = [0.1] * 384
             mock_qdrant.query_points.return_value = mock_results
@@ -84,8 +84,8 @@ class TestRetrieveDocuments:
         mock_results.points = []
 
         with (
-            patch("deployment.services.rag_service.embedder") as mock_embedder,
-            patch("deployment.services.rag_service.qdrant") as mock_qdrant,
+            patch("services.rag_service.embedder") as mock_embedder,
+            patch("services.rag_service.qdrant") as mock_qdrant,
         ):
             mock_embedder.encode.return_value.tolist.return_value = [0.1] * 384
             mock_qdrant.query_points.return_value = mock_results
@@ -95,8 +95,8 @@ class TestRetrieveDocuments:
 
     def test_not_initialized_raises(self):
         with (
-            patch("deployment.services.rag_service.embedder", None),
-            patch("deployment.services.rag_service.qdrant", None),
+            patch("services.rag_service.embedder", None),
+            patch("services.rag_service.qdrant", None),
         ):
             with pytest.raises(RuntimeError, match="not initialized"):
                 retrieve_documents("test")
@@ -116,7 +116,7 @@ class TestGenerateResponse:
             }
         ]
 
-        with patch("deployment.services.rag_service.litellm.completion") as mock:
+        with patch("services.rag_service.litellm.completion") as mock:
             mock.return_value = mock_response
             result = generate_response(
                 user_message="I feel anxious",
@@ -136,7 +136,7 @@ class TestGenerateResponse:
             {"role": "assistant", "content": "Hello"},
         ]
 
-        with patch("deployment.services.rag_service.litellm.completion") as mock:
+        with patch("services.rag_service.litellm.completion") as mock:
             mock.return_value = mock_response
             generate_response(
                 user_message="Help me",
@@ -170,9 +170,9 @@ class TestRagAnswer:
         mock_results.points = [mock_point]
 
         with (
-            patch("deployment.services.rag_service.litellm.completion") as mock_llm,
-            patch("deployment.services.rag_service.embedder") as mock_embedder,
-            patch("deployment.services.rag_service.qdrant") as mock_qdrant,
+            patch("services.rag_service.litellm.completion") as mock_llm,
+            patch("services.rag_service.embedder") as mock_embedder,
+            patch("services.rag_service.qdrant") as mock_qdrant,
         ):
             # First call is rewrite, second is generate
             mock_llm.side_effect = [mock_rewrite, mock_generate]
@@ -199,9 +199,9 @@ class TestRagAnswer:
         mock_results.points = []
 
         with (
-            patch("deployment.services.rag_service.litellm.completion") as mock_llm,
-            patch("deployment.services.rag_service.embedder") as mock_embedder,
-            patch("deployment.services.rag_service.qdrant") as mock_qdrant,
+            patch("services.rag_service.litellm.completion") as mock_llm,
+            patch("services.rag_service.embedder") as mock_embedder,
+            patch("services.rag_service.qdrant") as mock_qdrant,
         ):
             mock_llm.side_effect = [mock_rewrite, mock_generate]
             mock_embedder.encode.return_value.tolist.return_value = [0.1] * 384

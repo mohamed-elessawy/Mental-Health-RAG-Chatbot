@@ -3,11 +3,11 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
-from deployment.core.logging import setup_logging
-from deployment.monitoring.app_metrics import init_app_metrics
-from deployment.monitoring.config import otel_settings
-from deployment.monitoring.middleware import OtelMetricsMiddleware
-from deployment.monitoring.otel import setup_logs, setup_metrics, setup_traces
+from core.logging import setup_logging
+from monitoring.app_metrics import init_app_metrics
+from monitoring.config import otel_settings
+from monitoring.middleware import OtelMetricsMiddleware
+from monitoring.otel import setup_logs, setup_metrics, setup_traces
 
 logger = setup_logging()
 _instrumented = False

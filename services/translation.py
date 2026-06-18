@@ -1,7 +1,7 @@
 import litellm
 
-from deployment.core.config import config
-from deployment.schemas.prompts import get_translation_prompt
+from core.config import config
+from schemas.prompts import get_translation_prompt
 
 
 def translate_to_english(text: str, source_language: str) -> str:

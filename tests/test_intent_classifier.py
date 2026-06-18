@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from deployment.schemas.prompts import get_intent_classification_prompt
-from deployment.services.intent_classifier import classify_user_intent
+from schemas.prompts import get_intent_classification_prompt
+from services.intent_classifier import classify_user_intent
 
 VALID_INTENTS = {
     "greeting",
@@ -33,39 +33,39 @@ class TestIntentClassifierLogic:
         return mock_response
 
     def test_greeting_detected(self):
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("greeting")
             result = classify_user_intent("Hello!")
             assert result == "greeting"
 
     def test_goodbye_detected(self):
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("goodbye")
             result = classify_user_intent("Bye, thanks for the help")
             assert result == "goodbye"
 
     def test_mental_health_detected(self):
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("asking_mental_health_question")
             result = classify_user_intent("I have been feeling depressed")
             assert result == "asking_mental_health_question"
 
     def test_out_of_scope_detected(self):
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("out_of_scope")
             result = classify_user_intent("What is the capital of France?")
             assert result == "out_of_scope"
 
     def test_result_is_lowercased(self):
         """The function calls .lower() on the result."""
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("GREETING")
             result = classify_user_intent("Hi")
             assert result == "greeting"
 
     def test_result_is_stripped(self):
         """Whitespace around the label should be removed."""
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("  greeting  \n")
             result = classify_user_intent("Hi")
             assert result == "greeting"
@@ -78,7 +78,7 @@ class TestIntentClassifierLogic:
             {"role": "assistant", "content": "How can I help?"},
             {"role": "user", "content": "Thanks"},
         ]
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("gratitude")
             result = classify_user_intent("Thanks", history)
             assert result == "gratitude"
@@ -86,14 +86,14 @@ class TestIntentClassifierLogic:
             mock.assert_called_once()
 
     def test_empty_history_handled(self):
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.return_value = self._mock_llm_response("greeting")
             result = classify_user_intent("Hello", [])
             assert result == "greeting"
 
     def test_llm_failure_propagates(self):
         """If the LLM call fails, the error should propagate up."""
-        with patch("deployment.services.intent_classifier.litellm.completion") as mock:
+        with patch("services.intent_classifier.litellm.completion") as mock:
             mock.side_effect = RuntimeError("API timeout")
             with pytest.raises(RuntimeError, match="API timeout"):
                 classify_user_intent("Hello")

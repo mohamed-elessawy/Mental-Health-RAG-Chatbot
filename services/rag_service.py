@@ -4,8 +4,8 @@ import litellm
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
-from deployment.core.config import config
-from deployment.schemas.prompts import (
+from core.config import config
+from schemas.prompts import (
     get_generation_system_prompt,
     get_query_rewrite_prompt,
 )

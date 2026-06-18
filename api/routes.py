@@ -3,20 +3,20 @@ import logging
 import litellm
 from fastapi import APIRouter
 
-from deployment.core.config import config
-from deployment.monitoring.app_metrics import get_app_metrics
-from deployment.schemas.chat import (
+from core.config import config
+from monitoring.app_metrics import get_app_metrics
+from schemas.chat import (
     ChatRequest,
     ChatResponse,
     FeedbackRequest,
     FeedbackResponse,
 )
-from deployment.schemas.prompts import get_non_rag_system_prompt
-from deployment.services.emotion_detection import predict_emotion
-from deployment.services.intent_classifier import classify_user_intent
-from deployment.services.language_detection import detect_user_language
-from deployment.services.rag_service import rag_answer
-from deployment.services.translation import (
+from schemas.prompts import get_non_rag_system_prompt
+from services.emotion_detection import predict_emotion
+from services.intent_classifier import classify_user_intent
+from services.language_detection import detect_user_language
+from services.rag_service import rag_answer
+from services.translation import (
     translate_from_english,
     translate_to_english,
 )

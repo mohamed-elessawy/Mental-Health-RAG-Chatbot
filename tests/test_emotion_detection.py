@@ -6,7 +6,7 @@ Uses the real DistilBERT model. Marked as slow.
 
 import pytest
 
-from deployment.services.emotion_detection import predict_batch, predict_emotion
+from services.emotion_detection import predict_batch, predict_emotion
 
 VALID_LABELS = {"sadness", "joy", "love", "anger", "fear", "surprise"}
 

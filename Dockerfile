@@ -27,8 +27,13 @@ from sentence_transformers import SentenceTransformer; \
 SentenceTransformer('all-MiniLM-L6-v2')"
 
 # Copy application code last (changes most often)
-COPY deployment/ ./deployment/
+COPY main.py ./
+COPY api/ ./api/
+COPY core/ ./core/
+COPY schemas/ ./schemas/
+COPY services/ ./services/
+COPY monitoring/ ./monitoring/
 
 EXPOSE 7860
 
-CMD ["uv", "run", "uvicorn", "deployment.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

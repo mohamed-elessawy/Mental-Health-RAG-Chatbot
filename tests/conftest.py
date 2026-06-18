@@ -36,29 +36,29 @@ async def _empty_lifespan(app):
 @pytest.fixture()
 def client():
     with (
-        patch("deployment.main.lifespan", _empty_lifespan),
+        patch("main.lifespan", _empty_lifespan),
         patch(
-            "deployment.api.routes.detect_user_language",
+            "api.routes.detect_user_language",
             return_value="en",
         ),
         patch(
-            "deployment.api.routes.predict_emotion",
+            "api.routes.predict_emotion",
             return_value="sadness",
         ),
         patch(
-            "deployment.api.routes.classify_user_intent",
+            "api.routes.classify_user_intent",
             return_value="asking_mental_health_question",
         ),
         patch(
-            "deployment.api.routes.translate_to_english",
+            "api.routes.translate_to_english",
             side_effect=lambda text, lang: text,
         ),
         patch(
-            "deployment.api.routes.translate_from_english",
+            "api.routes.translate_from_english",
             side_effect=lambda text, lang: text,
         ),
         patch(
-            "deployment.api.routes.rag_answer",
+            "api.routes.rag_answer",
             return_value={
                 "answer": "I hear you. That sounds really difficult.",
                 "search_query": "feeling anxious",
@@ -66,12 +66,12 @@ def client():
                 "sources": ["How to cope with anxiety"],
             },
         ),
-        patch("deployment.services.emotion_detection.model", "fake-model"),
-        patch("deployment.services.language_detection._model", "fake-model"),
-        patch("deployment.services.rag_service.embedder", "fake-embedder"),
-        patch("deployment.services.rag_service.qdrant", "fake-qdrant"),
+        patch("services.emotion_detection.model", "fake-model"),
+        patch("services.language_detection._model", "fake-model"),
+        patch("services.rag_service.embedder", "fake-embedder"),
+        patch("services.rag_service.qdrant", "fake-qdrant"),
     ):
-        from deployment.main import app
+        from main import app
 
         with TestClient(app) as c:
             yield c
@@ -83,7 +83,7 @@ def client():
 @pytest.fixture(scope="session")
 def language_model():
     """Load the real language detection model once for all tests."""
-    from deployment.services.language_detection import _model, load_language_model
+    from services.language_detection import _model, load_language_model
 
     if _model is not None:
         return _model
@@ -93,7 +93,7 @@ def language_model():
     elapsed = time.time() - start
     print(f"\n[TIMING] Language model loaded in {elapsed:.2f}s")
 
-    from deployment.services.language_detection import _model
+    from services.language_detection import _model
 
     return _model
 
@@ -101,7 +101,7 @@ def language_model():
 @pytest.fixture(scope="session")
 def emotion_model():
     """Load the real emotion detection model once for all tests."""
-    from deployment.services.emotion_detection import (
+    from services.emotion_detection import (
         load_emotion_model,
         model,
         tokenizer,
@@ -115,6 +115,6 @@ def emotion_model():
     elapsed = time.time() - start
     print(f"\n[TIMING] Emotion model loaded in {elapsed:.2f}s")
 
-    from deployment.services.emotion_detection import model, tokenizer
+    from services.emotion_detection import model, tokenizer
 
     return model, tokenizer

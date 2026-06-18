@@ -21,7 +21,6 @@ assets/
 .pre-commit-config.yaml
 
 models/
-deployment/tests/
-deployment/.env
-deployment/.env.example
+tests/
+.env.example
 README.md
