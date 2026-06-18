@@ -4,6 +4,7 @@
 .venv/
 venv/
 .env
+.vscode/
 .pytest_cache/
 .ruff_cache/
 .coverage
@@ -24,6 +25,8 @@ requirements.txt
 .pre-commit-config.yaml
 conftest.py
 test_results.txt
+dashboard.png
+Cached_build.png
 
 deployment/tests/
 deployment/.env
