@@ -11,7 +11,6 @@ load_dotenv(dotenv_path=env_path)
 from deployment.api.routes import router  # noqa: E402
 from deployment.core.config import config  # noqa: E402
 from deployment.core.logging import setup_logging  # noqa: E402
-from deployment.monitoring import instrument_app  # noqa: E402
 from deployment.services import (  # noqa: E402
     emotion_detection,
     language_detection,
