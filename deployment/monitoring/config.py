@@ -34,7 +34,9 @@ class OtelSettings(BaseSettings):
     AXIOM_METRICS_DATASET: str = "serenity-metrics"
     AXIOM_LOGS_DATASET: str = "serenity-logs"
 
-    def _axiom_headers(self, dataset: str, metrics_dataset: bool = False) -> dict[str, str]:
+    def _axiom_headers(
+        self, dataset: str, metrics_dataset: bool = False
+    ) -> dict[str, str]:
         dataset_header = (
             "X-Axiom-Metrics-Dataset" if metrics_dataset else "X-Axiom-Dataset"
         )
