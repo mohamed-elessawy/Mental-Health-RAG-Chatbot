@@ -86,7 +86,7 @@ OpenTelemetry monitoring enabled for service=serenity-mental-health-api
 
 ## Axiom dashboard
 
-![Serenity API Monitoring dashboard](dashboard/dashboard_metrics.png)
+![Serenity API Monitoring dashboard](dashboard/dashboard.png)
 
 Panels cover all three assignment metrics (NLP, data, server) plus supporting signals. Add panels in Axiom using MPL queries from [axiom-dashboard-queries.txt](axiom-dashboard-queries.txt).
 
@@ -131,7 +131,7 @@ deployment/monitoring/
   ├── middleware.py         ← HTTP request metrics
   ├── instrument.py         ← wires everything together
   ├── axiom-dashboard-queries.txt
-  └── dashboard/dashboard_metrics.png
+  └── dashboard/dashboard.png
 ```
 
 ## Disabling monitoring
