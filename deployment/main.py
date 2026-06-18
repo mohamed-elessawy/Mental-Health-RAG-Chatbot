@@ -17,6 +17,9 @@ from deployment.services import (  # noqa: E402
     rag_service,
 )
 
+# 1. Import the monitoring instrument wrapper
+from deployment.monitoring import instrument_app  # noqa: E402
+
 logger = setup_logging(config.LOG_LEVEL)
 
 
@@ -80,3 +83,11 @@ async def health_check():
 
 
 app.include_router(router)
+
+# 2. Instrument the app with OpenTelemetry right before exporting it
+# This hooks traces, metrics, and logs dynamically based on your env variables!
+app = instrument_app(app)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("deployment.main:app", host="0.0.0.0", port=7860, reload=True)
