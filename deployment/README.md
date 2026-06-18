@@ -325,3 +325,47 @@ Response: `{"emotion": "fear"}`
 ```
 
 Response: `{"intent": "asking_mental_health_question"}`
+
+---
+
+## System Monitoring
+
+The API is instrumented with [OpenTelemetry](https://opentelemetry.io/) and exports traces, metrics, and logs directly to [Axiom](https://axiom.co). See [monitoring/README.md](monitoring/README.md) for full setup.
+
+Add to `deployment/.env`:
+
+```dotenv
+OTEL_ENABLED=true
+AXIOM_TOKEN=your_axiom_api_token
+```
+
+Run the instrumented API:
+
+```bash
+uvicorn deployment.main_otel:app --reload
+```
+
+### Three chosen metrics and reasoning
+
+| # | Category | Metric | Recorded when | Why we track it |
+|---|----------|--------|---------------|-----------------|
+| 1 | **Model / NLP** | `nlp.intent.classified` | After intent classification on `/chat` | Shows user intent distribution; spikes in `out_of_scope` may indicate prompt issues or misuse |
+| 2 | **Data** | `data.chat.message.length` | On every `/chat` request | Detects abnormal input sizes (very short bot-like messages or very long abuse/injection attempts) |
+| 3 | **Server** | `http.server.request.count` | On every HTTP request via middleware | Tracks request volume; `http.status_code` attribute enables per-route error rate |
+
+Additional signals: `data.feedback.vote` (thumbs up/down), `http.server.request.duration`, `server.process.uptime`.
+
+### Axiom dashboard
+
+![Axiom metrics dashboard](monitoring/dashboard/dashboard_metrics.png)
+
+| Panel | Metric | Category | Why we track it |
+|-------|--------|----------|-----------------|
+| Intent Classification Rate | `nlp.intent.classified` | Model / NLP | How users interact with the bot |
+| Message Length | `data.chat.message.length` | Data | Input quality and abuse detection |
+| Request Volume Over Time | `http.server.request.count` | Server | Load and availability |
+| User Feedback Volume | `data.feedback.vote` | Data | Response satisfaction |
+| Concurrent Requests Trend | `http.server.active_requests` | Server | Live concurrency |
+| Process Uptime History | `server.process.uptime` | Server | Service health |
+
+MPL dashboard queries: [monitoring/axiom-dashboard-queries.txt](monitoring/axiom-dashboard-queries.txt)

@@ -5,6 +5,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
+from deployment.monitoring.app_metrics import init_app_metrics
 from deployment.monitoring.config import otel_settings
 from deployment.monitoring.middleware import OtelMetricsMiddleware
 from deployment.monitoring.otel import setup_logs, setup_metrics, setup_traces
@@ -28,6 +29,7 @@ def instrument_app(app: FastAPI) -> FastAPI:
 
     setup_traces(otel_settings)
     meter = setup_metrics(otel_settings)
+    init_app_metrics(meter)
     setup_logs(otel_settings)
 
     LoggingInstrumentor().instrument(set_logging_format=True)

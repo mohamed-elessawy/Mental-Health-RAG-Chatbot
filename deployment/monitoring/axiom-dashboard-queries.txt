@@ -2,26 +2,89 @@ Axiom Dashboard Queries — Serenity Mental Health API
 =====================================================
 
 Datasets (from deployment/.env):
-  - Traces  → serenity-traces
-  - Metrics → serenity-metrics
-  - Logs    → serenity-logs
+  - Traces  → serenity-traces   (use APL — section below)
+  - Metrics → serenity-metrics  (use MPL — primary section)
+  - Logs    → serenity-logs     (use APL — section at bottom)
   - Service → serenity-mental-health-api
 
-Note: Field names may differ slightly in Axiom. If a query fails, check the
-field browser on serenity-traces for exact names (e.g. attributes.http.route).
+Note: Metrics panels MUST use MPL (not APL). Traces and logs use APL.
+Histogram metrics (message length, request duration) need `bucket` — NOT `avg(value)`.
+If a query returns empty, open serenity-metrics → Metrics browser and confirm the name.
 
 
-TRACES DATASET (serenity-traces)
---------------------------------
+PRIMARY METRICS (serenity-metrics) — MPL
+----------------------------------------
 
-1. Total requests over time
+Use these three for the assignment dashboard panels.
+
+1. Intent distribution (NLP) — nlp.intent.classified  [Counter]
+`serenity-metrics`:`nlp.intent.classified`
+| group by `intent` using sum
+
+
+2. Message length p50 / p95 (Data) — data.chat.message.length  [Histogram]
+Try delta temporality first:
+`serenity-metrics`:`data.chat.message.length`
+| bucket to 5m using interpolate_delta_histogram(0.50, 0.95)
+
+If empty, try cumulative:
+`serenity-metrics`:`data.chat.message.length`
+| bucket to 5m using interpolate_cumulative_histogram(rate, 0.50, 0.95)
+
+Chat message count (how many /chat calls recorded):
+`serenity-metrics`:`data.chat.message.length`
+| where `axiom.histogram` == "count"
+| align to 5m using sum
+
+
+3. Request volume (Server) — http.server.request.count  [Counter]
+`serenity-metrics`:`http.server.request.count`
+| align to 5m using sum
+
+
+4. Error rate (Server) — requests with status >= 400
+`serenity-metrics`:`http.server.request.count`
+| where `http.status_code` >= 400
+| align to 5m using sum
+| group by `http.status_code` using sum
+
+
+5. Feedback votes (Data) — data.feedback.vote  [Counter]
+`serenity-metrics`:`data.feedback.vote`
+| group by `vote` using sum
+
+
+6. Request count by route
+`serenity-metrics`:`http.server.request.count`
+| group by `http.route` using sum
+
+
+7. Request duration p95 by route (Histogram)
+`serenity-metrics`:`http.server.request.duration`
+| bucket by `http.route` to 5m using interpolate_delta_histogram(0.95)
+
+
+8. Active requests (live load)  [UpDownCounter / Gauge]
+`serenity-metrics`:`http.server.active_requests`
+| align to 1m using max
+
+
+9. Process uptime (seconds)  [Observable gauge]
+`serenity-metrics`:`server.process.uptime`
+| align to 1m using max
+
+
+TRACES DATASET (serenity-traces) — APL
+--------------------------------------
+
+11. Total requests over time
 ['serenity-traces']
 | where ['service.name'] == "serenity-mental-health-api"
 | where ['attributes.http.route'] != "/health"
 | summarize count() by bin(_time, 5m)
 
 
-2. Requests per endpoint
+12. Requests per endpoint
 ['serenity-traces']
 | where ['service.name'] == "serenity-mental-health-api"
 | where isnotnull(['attributes.http.route'])
@@ -29,7 +92,7 @@ TRACES DATASET (serenity-traces)
 | order by count_ desc
 
 
-3. Average latency per endpoint (ms)
+13. Average latency per endpoint (ms)
 ['serenity-traces']
 | where ['service.name'] == "serenity-mental-health-api"
 | where isnotnull(['attributes.http.route'])
@@ -38,30 +101,7 @@ TRACES DATASET (serenity-traces)
 | order by avg_ms desc
 
 
-4. P95 latency per endpoint (ms)
-['serenity-traces']
-| where ['service.name'] == "serenity-mental-health-api"
-| where isnotnull(['attributes.http.route'])
-| summarize percentile(duration, 95) by ['attributes.http.route']
-| extend p95_ms = percentile_duration_95 * 1000
-| order by p95_ms desc
-
-
-5. Error rate (4xx + 5xx)
-['serenity-traces']
-| where ['service.name'] == "serenity-mental-health-api"
-| where ['attributes.http.status_code'] >= 400
-| summarize error_count = count() by bin(_time, 5m), ['attributes.http.status_code']
-
-
-6. Status code breakdown
-['serenity-traces']
-| where ['service.name'] == "serenity-mental-health-api"
-| summarize count() by ['attributes.http.status_code']
-| order by count_ desc
-
-
-7. /chat endpoint latency over time
+14. /chat endpoint latency over time
 ['serenity-traces']
 | where ['service.name'] == "serenity-mental-health-api"
 | where ['attributes.http.route'] == "/chat"
@@ -69,17 +109,7 @@ TRACES DATASET (serenity-traces)
 | extend avg_ms = avg_duration * 1000, p95_ms = percentile_duration_95 * 1000
 
 
-8. Slowest requests (top 20)
-['serenity-traces']
-| where ['service.name'] == "serenity-mental-health-api"
-| where duration > 1
-| project _time, name, ['attributes.http.method'], ['attributes.http.route'], ['attributes.http.status_code'], duration, trace_id
-| extend duration_ms = duration * 1000
-| order by duration desc
-| take 20
-
-
-9. Outbound calls (LLM / Qdrant via httpx)
+15. Outbound calls (LLM / Qdrant via httpx)
 ['serenity-traces']
 | where ['service.name'] == "serenity-mental-health-api"
 | where name contains "HTTP" or name contains "httpx"
@@ -88,85 +118,45 @@ TRACES DATASET (serenity-traces)
 | order by count_ desc
 
 
-METRICS DATASET (serenity-metrics)
+LOGS DATASET (serenity-logs) — APL
 ----------------------------------
 
-10. Request count over time
-['serenity-metrics']
-| where name == "http.server.request.count"
-| summarize sum(value) by bin(_time, 5m)
-
-
-11. Request count by route
-['serenity-metrics']
-| where name == "http.server.request.count"
-| summarize sum(value) by ['attributes.http.route']
-| order by sum_value desc
-
-
-12. Avg request duration by route (seconds)
-['serenity-metrics']
-| where name == "http.server.request.duration"
-| summarize avg(value) by ['attributes.http.route']
-| order by avg_value desc
-
-
-13. Active requests (live load)
-['serenity-metrics']
-| where name == "http.server.active_requests"
-| summarize max(value) by bin(_time, 1m)
-
-
-14. Error requests (status >= 400)
-['serenity-metrics']
-| where name == "http.server.request.count"
-| where ['attributes.http.status_code'] >= 400
-| summarize sum(value) by bin(_time, 5m), ['attributes.http.status_code']
-
-
-LOGS DATASET (serenity-logs)
-----------------------------
-
-15. Error logs over time
+16. Error logs over time
 ['serenity-logs']
 | where severity_text == "ERROR" or level == "ERROR"
 | summarize count() by bin(_time, 5m)
 
 
-16. Recent errors (last 50)
-['serenity-logs']
-| where severity_text == "ERROR" or level == "ERROR"
-| project _time, body, ['attributes.code.file.path'], trace_id
-| order by _time desc
-| take 50
-
-
 17. Chat pipeline logs
 ['serenity-logs']
-| where body contains "Chat request" or body contains "Intent:" or body contains "Emotion:" or body contains "Language:"
+| where body contains "Chat request" or body contains "Intent:" or body contains "Emotion:"
 | project _time, body, trace_id
 | order by _time desc
 | take 100
 
 
-18. RAG / LLM failures
-['serenity-logs']
-| where body contains "failed" or body contains "RAG pipeline" or body contains "LLM call"
-| project _time, body, trace_id
-| order by _time desc
-| take 50
+SUGGESTED DASHBOARD PANELS (assignment)
+---------------------------------------
+
+Panel                    | Query # | Dataset          | Chart type
+-------------------------|---------|------------------|------------
+Intent Classification    | 1       | serenity-metrics | Time series
+Message Length           | 2       | serenity-metrics | Time series
+Request volume           | 3       | serenity-metrics | Time series
+Error rate               | 4       | serenity-metrics | Time series
+Feedback votes           | 5       | serenity-metrics | Bar
+Active requests          | 8       | serenity-metrics | Time series
+Uptime                   | 9       | serenity-metrics | Time series
+/chat latency (traces)  | 14      | serenity-traces  | Time series
 
 
-SUGGESTED DASHBOARD PANELS
---------------------------
+TROUBLESHOOTING — panel empty or MPL error
+------------------------------------------
 
-Panel              | Query # | Chart type
--------------------|---------|------------
-Requests/min       | 1       | Time series
-Latency by endpoint| 3 or 4  | Bar chart
-/chat latency      | 7       | Time series
-Error rate         | 5 or 14 | Time series
-Status codes       | 6       | Pie / bar
-Active requests    | 13      | Time series
-Error logs         | 15      | Time series
-Slow requests      | 8       | Table
+1. Dataset: use **serenity-metrics** (Metrics type), not serenity-traces.
+2. Generate data: `data.chat.message.length` is only recorded on **POST /chat**.
+3. Wait ~15–30 seconds after requests (OTLP export interval is 15s).
+4. Histogram query must be on ONE line — do not merge two queries:
+   `| bucket to 5m using interpolate_delta_histogram(0.50, 0.95)`
+5. If delta histogram is empty, try cumulative (query #2 alternate in file above).
+6. Tag names may be `intent`, `http.route` — check Metrics browser in Axiom.

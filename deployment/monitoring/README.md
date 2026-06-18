@@ -1,101 +1,140 @@
 # OpenTelemetry Monitoring
 
-OpenTelemetry-based API monitoring for the Serenity Mental Health Chatbot. Exports traces, metrics, and logs via OTLP to any compatible backend (Jaeger, Grafana Cloud, Axiom, Honeycomb, etc.).
+OpenTelemetry-based API monitoring for the Serenity Mental Health Chatbot. Exports traces, metrics, and logs directly to [Axiom](https://axiom.co) via OTLP/HTTP.
 
-**No existing application code is modified.** Instrumentation lives entirely in `deployment/monitoring/` and is activated via a separate entry point.
+Instrumentation lives in `deployment/monitoring/` and is activated via `deployment/main_otel.py` (or `deployment.main:app`, which also calls `instrument_app()`).
 
-## What gets monitored
+## Architecture
 
-| Signal | What's captured |
-|--------|-----------------|
-| **Traces** | HTTP requests, FastAPI routes, outbound httpx calls (LLM/Qdrant) |
-| **Metrics** | Request count, duration histogram, active requests per route |
-| **Logs** | Application logs with trace correlation |
+```
+FastAPI (main_otel.py or main.py)
+  │  OTLP/HTTP + AXIOM_TOKEN from deployment/.env
+  ▼
+Axiom
+  ├── serenity-traces   (HTTP spans, LLM/Qdrant outbound calls)
+  ├── serenity-metrics  (custom + auto HTTP metrics)
+  └── serenity-logs     (application logs with trace correlation)
+```
 
-The `/health` endpoint is excluded from trace instrumentation to reduce noise.
+No Docker or OpenTelemetry Collector is required for local development.
+
+## Chosen metrics
+
+Three primary metrics — one per assignment category — drive the Axiom dashboard:
+
+| Category | Metric | Type | Why we track it |
+|----------|--------|------|-----------------|
+| **Model / NLP** | `nlp.intent.classified` | Counter | Shows how users interact (greetings vs mental-health questions vs out-of-scope) and flags unusual intent spikes |
+| **Data** | `data.chat.message.length` | Histogram | Surfaces very short or very long inputs that may indicate abuse, injection attempts, or UX issues |
+| **Server** | `http.server.request.count` | Counter | Tracks request volume and error rate via `http.status_code` labels |
+
+Supporting metrics:
+
+| Metric | Type | Purpose |
+|--------|------|---------|
+| `data.feedback.vote` | Counter | Thumbs up/down on bot responses |
+| `http.server.request.duration` | Histogram | Per-route latency |
+| `http.server.active_requests` | UpDownCounter | Live concurrency |
+| `server.process.uptime` | Observable gauge | Process availability |
 
 ## Setup
 
-### 1. Configure OTLP export
-
-Add OpenTelemetry variables to `deployment/.env`. Example with a local [OTel Collector](https://opentelemetry.io/docs/collector/):
+### 1. Configure Axiom in `deployment/.env`
 
 ```dotenv
 OTEL_ENABLED=true
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+AXIOM_TOKEN=your_axiom_api_token
 OTEL_SERVICE_NAME=serenity-mental-health-api
 OTEL_SERVICE_VERSION=0.1.0
 OTEL_DEPLOYMENT_ENVIRONMENT=development
 ```
 
-Example with per-signal endpoints (e.g. Axiom, Grafana Cloud):
+`AXIOM_TOKEN` alone builds all OTLP endpoints and auth headers. You do **not** need to set `OTEL_EXPORTER_OTLP_*_ENDPOINT` for Axiom.
 
-```dotenv
-OTEL_ENABLED=true
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.axiom.co/v1/traces
-OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://api.axiom.co/v1/metrics
-OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://api.axiom.co/v1/logs
-OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Bearer YOUR_TOKEN,X-Axiom-Dataset=serenity-traces
-OTEL_EXPORTER_OTLP_METRICS_HEADERS=Authorization=Bearer YOUR_TOKEN,X-Axiom-Metrics-Dataset=serenity-metrics
-OTEL_EXPORTER_OTLP_LOGS_HEADERS=Authorization=Bearer YOUR_TOKEN,X-Axiom-Dataset=serenity-logs
-OTEL_SERVICE_NAME=serenity-mental-health-api
-```
+Create three datasets in Axiom (or rename via env vars):
+
+| Env var | Default dataset |
+|---------|-----------------|
+| `AXIOM_TRACES_DATASET` | `serenity-traces` |
+| `AXIOM_METRICS_DATASET` | `serenity-metrics` |
+| `AXIOM_LOGS_DATASET` | `serenity-logs` |
 
 ### 2. Install dependencies
 
 ```bash
 uv sync
+# or: pip install -r requirements.txt
 ```
 
 ### 3. Run the instrumented API
 
 ```bash
-uv run uvicorn deployment.main_otel:app --reload
+uvicorn deployment.main_otel:app --reload
 ```
 
-The original entry point (`deployment.main:app`) is unchanged.
-
-## Docker
+The original entry point also works (instrumentation is wired in `main.py`):
 
 ```bash
-docker build -t mental-health-chatbot .
-docker run --env-file deployment/.env -p 8000:8000 \
-  mental-health-chatbot \
-  uv run uvicorn deployment.main_otel:app --host 0.0.0.0 --port 8000
+uvicorn deployment.main:app --reload
 ```
+
+On success you should see:
+
+```
+OpenTelemetry monitoring enabled for service=serenity-mental-health-api
+```
+
+## Axiom dashboard
+
+![Serenity API Monitoring dashboard](dashboard/dashboard_metrics.png)
+
+Panels cover all three assignment metrics (NLP, data, server) plus supporting signals. Add panels in Axiom using MPL queries from [axiom-dashboard-queries.txt](axiom-dashboard-queries.txt).
+
+| Panel | Metric | MPL query # |
+|-------|--------|-------------|
+| Intent Classification Rate | `nlp.intent.classified` | 1 |
+| Message Length | `data.chat.message.length` | 2 |
+| Request Volume Over Time | `http.server.request.count` | 3 |
+| User Feedback Volume | `data.feedback.vote` | 5 |
+| Concurrent Requests / Peak Load | `http.server.active_requests` | 8 |
+| Process Uptime History | `server.process.uptime` | 9 |
+
+**Note:** Histogram metrics (`data.chat.message.length`) use `bucket` in MPL, not `avg(value)`. Counters use `align` / `group using sum`.
 
 ## Environment variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `OTEL_ENABLED` | No | `true` | Set `false` to disable export |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | No* | — | Base OTLP/HTTP endpoint (auto-appends `/v1/traces`, etc.) |
-| `OTEL_EXPORTER_OTLP_HEADERS` | No | — | Shared headers: `key=value,key2=value2` |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | No* | — | Traces endpoint (overrides base) |
-| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | No | — | Traces-specific headers |
-| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | No* | — | Metrics endpoint (overrides base) |
-| `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | No | — | Metrics-specific headers |
-| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | No* | — | Logs endpoint (overrides base) |
-| `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | No | — | Logs-specific headers |
+| `AXIOM_TOKEN` | Yes* | — | Axiom API token; auto-configures endpoints and headers |
+| `AXIOM_TRACES_DATASET` | No | `serenity-traces` | Traces dataset name |
+| `AXIOM_METRICS_DATASET` | No | `serenity-metrics` | Metrics dataset name |
+| `AXIOM_LOGS_DATASET` | No | `serenity-logs` | Logs dataset name |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | — | Generic OTLP base URL (non-Axiom backends) |
+| `OTEL_EXPORTER_OTLP_*_ENDPOINT` | No | — | Per-signal override |
+| `OTEL_EXPORTER_OTLP_*_HEADERS` | No | — | Per-signal headers (`key=value,key2=value2`) |
 | `OTEL_SERVICE_NAME` | No | `serenity-mental-health-api` | Service name in telemetry |
 | `OTEL_SERVICE_VERSION` | No | `0.1.0` | Service version |
 | `OTEL_DEPLOYMENT_ENVIRONMENT` | No | `development` | Deployment environment label |
 
-\* At least one endpoint (`OTEL_EXPORTER_OTLP_ENDPOINT` or a per-signal endpoint) must be set for export to activate.
+\* Either `AXIOM_TOKEN` or at least one OTLP endpoint must be set.
 
-## Architecture
+## File layout
 
 ```
-deployment/main.py          ← unchanged FastAPI app
-deployment/main_otel.py     ← imports app + calls instrument_app()
+deployment/main.py          ← FastAPI app (also calls instrument_app)
+deployment/main_otel.py     ← dedicated instrumented entry point
 deployment/monitoring/
-  ├── config.py             ← OTEL env settings
-  ├── otel.py               ← OTLP exporters (traces, metrics, logs)
+  ├── app_metrics.py        ← NLP, data, uptime metrics
+  ├── config.py             ← OTEL + AXIOM env settings
+  ├── otel.py               ← OTLP exporters
   ├── middleware.py         ← HTTP request metrics
-  └── instrument.py         ← wires everything together
+  ├── instrument.py         ← wires everything together
+  ├── axiom-dashboard-queries.txt
+  └── dashboard/dashboard_metrics.png
 ```
 
 ## Disabling monitoring
 
-- Set `OTEL_ENABLED=false`, or leave all OTLP endpoints empty
-- Run the original entry point: `uvicorn deployment.main:app`
+- Set `OTEL_ENABLED=false`, or remove `AXIOM_TOKEN` and all OTLP endpoints
+- Run without instrumentation: ensure `OTEL_ENABLED=false` in `.env`

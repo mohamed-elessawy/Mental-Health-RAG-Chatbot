@@ -4,6 +4,7 @@ import litellm
 from fastapi import APIRouter
 
 from deployment.core.config import config
+from deployment.monitoring.app_metrics import get_app_metrics
 from deployment.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -55,6 +56,7 @@ async def classify_intent_endpoint(request: ChatRequest):
 
 @router.post("/feedback", response_model=FeedbackResponse)
 async def feedback_endpoint(request: FeedbackRequest):
+    get_app_metrics().record_feedback(request.vote)
     logger.info(
         "Feedback: vote=%s, user_message_length=%d",
         request.vote,
@@ -67,6 +69,8 @@ async def feedback_endpoint(request: FeedbackRequest):
 async def chat_endpoint(request: ChatRequest):
     user_message = request.message
     history = [msg.model_dump() for msg in request.history]
+    metrics = get_app_metrics()
+    metrics.record_message_length(len(user_message))
 
     logger.info(
         "Chat request: length=%d, history_size=%d", len(user_message), len(history)
@@ -90,6 +94,7 @@ async def chat_endpoint(request: ChatRequest):
     if intent not in NON_RAG_INTENTS and intent != "asking_mental_health_question":
         intent = "out_of_scope"
     logger.info("Intent: %s", intent)
+    metrics.record_intent(intent)
 
     # Step 3 - handle non-RAG intents
     if intent in NON_RAG_INTENTS:
