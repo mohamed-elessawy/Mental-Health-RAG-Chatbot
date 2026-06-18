@@ -3,7 +3,7 @@ name: Serenity Backend CI/CD Pipeline
 on:
   push:
     branches:
-      - main
+      - mlops
 
 jobs:
   # 1. Lint + Unit Tests
@@ -109,7 +109,7 @@ jobs:
 
           # 4. Stage everything EXCEPT the outputs folder
           git add .
-          git rm -rf --cached outputs/ notebooks/ models/ || true
+          git rm -rf --cached assets/ || true
 
           # 5. Commit it as a single, fresh deployment commit
           git commit -m "deploy: initial clean release to hugging face"
